@@ -1,0 +1,30 @@
+{
+  "name": "@deploylogdev/action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Action to publish changelog entries from GitHub Releases to DeployLog.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "npm run typecheck && npm run test && npm run build"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deploylogdev/action.git"
+  },
+  "homepage": "https://deploylog.dev",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.4"
+  }
+}

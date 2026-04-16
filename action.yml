@@ -1,0 +1,44 @@
+name: DeployLog
+description: Publish changelog entries from GitHub Releases. Optionally rewrite release notes for end users with AI.
+author: DeployLog
+branding:
+  icon: bell
+  color: blue
+
+inputs:
+  api-key:
+    description: DeployLog API key (store as a repository secret, e.g. DEPLOYLOG_API_KEY).
+    required: true
+  project:
+    description: Project slug from your DeployLog dashboard.
+    required: true
+  ai-summarize:
+    description: Rewrite the release body into user-friendly release notes using Claude Haiku.
+    required: false
+    default: "false"
+  notify-subscribers:
+    description: Publish the entry immediately so email subscribers receive a digest. When false, the entry is saved as a draft you can publish from the dashboard.
+    required: false
+    default: "false"
+  entry-type:
+    description: "Entry type: feature, fix, improvement, breaking, or announcement. Ignored when ai-summarize picks one."
+    required: false
+    default: feature
+  api-url:
+    description: Override the DeployLog API base URL (for staging/self-hosted).
+    required: false
+    default: https://deploylog.dev
+
+outputs:
+  entry-id:
+    description: The ID of the created DeployLog entry.
+  entry-slug:
+    description: The slug of the created DeployLog entry.
+  entry-published:
+    description: Whether the entry was published (true) or saved as a draft (false).
+  ai-used:
+    description: Whether AI summarization was used (true/false).
+
+runs:
+  using: node20
+  main: dist/index.js
