@@ -23878,11 +23878,11 @@ var require_github = __commonJS({
 });
 
 // src/main.ts
-var core2 = __toESM(require_core(), 1);
-var github = __toESM(require_github(), 1);
+var core2 = __toESM(require_core());
+var github = __toESM(require_github());
 
 // src/inputs.ts
-var core = __toESM(require_core(), 1);
+var core = __toESM(require_core());
 var ENTRY_TYPES = [
   "feature",
   "fix",
