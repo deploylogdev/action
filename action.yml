@@ -2,7 +2,7 @@ name: Publish to DeployLog
 description: Publish changelog entries from GitHub Releases to DeployLog. Optionally rewrite release notes for end users with AI.
 author: DeployLog
 branding:
-  icon: bell
+  icon: tag
   color: blue
 
 inputs:
