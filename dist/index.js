@@ -21269,10 +21269,10 @@ var require_core = __commonJS({
       (0, command_1.issueCommand)("set-env", { name }, convertedVal);
     }
     exports2.exportVariable = exportVariable;
-    function setSecret(secret) {
+    function setSecret2(secret) {
       (0, command_1.issueCommand)("add-mask", {}, secret);
     }
-    exports2.setSecret = setSecret;
+    exports2.setSecret = setSecret2;
     function addPath(inputPath) {
       const filePath = process.env["GITHUB_PATH"] || "";
       if (filePath) {
@@ -25504,11 +25504,13 @@ function readInputs() {
   const project = core.getInput("project", { required: true }).trim();
   const aiSummarize = readBool("ai-summarize", false);
   const notifySubscribers = readBool("notify-subscribers", false);
+  const skipPrerelease = readBool("skip-prerelease", false);
   const entryTypeRaw = (core.getInput("entry-type") || "feature").trim().toLowerCase();
   const apiUrl = (core.getInput("api-url") || "https://deploylog.dev").trim().replace(/\/+$/, "");
   if (!apiKey.startsWith("dk_")) {
     throw new Error('Invalid api-key. Keys issued by DeployLog start with "dk_".');
   }
+  core.setSecret(apiKey);
   if (!isEntryType(entryTypeRaw)) {
     throw new Error(
       `Invalid entry-type "${entryTypeRaw}". Must be one of: ${ENTRY_TYPES.join(", ")}`
@@ -25520,7 +25522,8 @@ function readInputs() {
     aiSummarize,
     notifySubscribers,
     entryType: entryTypeRaw,
-    apiUrl
+    apiUrl,
+    skipPrerelease
   };
 }
 function isEntryType(value) {
@@ -25639,6 +25642,10 @@ async function run(opts) {
   }
   if (release.draft) {
     logger.info("Release is marked as draft. Skipping DeployLog entry.");
+    return;
+  }
+  if (inputs.skipPrerelease && release.prerelease) {
+    logger.info("Release is a prerelease and skip-prerelease is set. Skipping DeployLog entry.");
     return;
   }
   const derived = deriveEntryFromRelease(release);

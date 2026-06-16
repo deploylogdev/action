@@ -33,6 +33,7 @@ const baseInputs: ActionInputs = {
   notifySubscribers: false,
   entryType: 'feature',
   apiUrl: 'https://deploylog.dev',
+  skipPrerelease: false,
 }
 
 interface FakeClient {
@@ -66,6 +67,35 @@ describe('run', () => {
     await run({ inputs: baseInputs, release: null, logger, clientFactory: makeClientFactory(client) })
     expect(logger.failures[0]).toMatch(/must run on `release` events/)
     expect(client.createEntry).not.toHaveBeenCalled()
+  })
+
+  it('skips prereleases when skip-prerelease is set', async () => {
+    const release: ReleasePayload = {
+      tag_name: 'v2.0.0-rc.1',
+      name: 'RC',
+      body: 'notes',
+      prerelease: true,
+    }
+    await run({
+      inputs: { ...baseInputs, skipPrerelease: true },
+      release,
+      logger,
+      clientFactory: makeClientFactory(client),
+    })
+    expect(logger.failures).toEqual([])
+    expect(client.createEntry).not.toHaveBeenCalled()
+  })
+
+  it('publishes prereleases when skip-prerelease is not set', async () => {
+    const release: ReleasePayload = {
+      tag_name: 'v2.0.0-rc.1',
+      name: 'RC',
+      body: 'notes',
+      prerelease: true,
+    }
+    await run({ inputs: baseInputs, release, logger, clientFactory: makeClientFactory(client) })
+    expect(logger.failures).toEqual([])
+    expect(client.createEntry).toHaveBeenCalled()
   })
 
   it('skips draft releases without creating an entry', async () => {

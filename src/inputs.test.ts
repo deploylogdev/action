@@ -32,6 +32,7 @@ describe('readInputs', () => {
       notifySubscribers: false,
       entryType: 'feature',
       apiUrl: 'https://deploylog.dev',
+      skipPrerelease: false,
     })
   })
 

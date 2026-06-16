@@ -17,6 +17,7 @@ export interface ActionInputs {
   notifySubscribers: boolean
   entryType: EntryType
   apiUrl: string
+  skipPrerelease: boolean
 }
 
 export function readInputs(): ActionInputs {
@@ -24,12 +25,17 @@ export function readInputs(): ActionInputs {
   const project = core.getInput('project', { required: true }).trim()
   const aiSummarize = readBool('ai-summarize', false)
   const notifySubscribers = readBool('notify-subscribers', false)
+  const skipPrerelease = readBool('skip-prerelease', false)
   const entryTypeRaw = (core.getInput('entry-type') || 'feature').trim().toLowerCase()
   const apiUrl = (core.getInput('api-url') || 'https://deploylog.dev').trim().replace(/\/+$/, '')
 
   if (!apiKey.startsWith('dk_')) {
     throw new Error('Invalid api-key. Keys issued by DeployLog start with "dk_".')
   }
+
+  // Defensively mask the key in logs even if the caller passed a literal instead
+  // of wiring it through ${{ secrets.* }}. (BUG-016)
+  core.setSecret(apiKey)
 
   if (!isEntryType(entryTypeRaw)) {
     throw new Error(
@@ -44,6 +50,7 @@ export function readInputs(): ActionInputs {
     notifySubscribers,
     entryType: entryTypeRaw,
     apiUrl,
+    skipPrerelease,
   }
 }
 
