@@ -35,6 +35,11 @@ export async function run(opts: RunOptions): Promise<void> {
     return
   }
 
+  if (inputs.skipPrerelease && release.prerelease) {
+    logger.info('Release is a prerelease and skip-prerelease is set. Skipping DeployLog entry.')
+    return
+  }
+
   const derived = deriveEntryFromRelease(release)
   const factory = opts.clientFactory ?? createApiClient
   const client = factory({ baseUrl: inputs.apiUrl, apiKey: inputs.apiKey })

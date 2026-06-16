@@ -20,6 +20,10 @@ inputs:
     description: Publish the entry immediately so email subscribers receive a digest. When false, the entry is saved as a draft you can publish from the dashboard.
     required: false
     default: "false"
+  skip-prerelease:
+    description: Skip GitHub prereleases (e.g. v2.0.0-rc.1) instead of publishing them to DeployLog. Useful to avoid notifying subscribers about release candidates.
+    required: false
+    default: "false"
   entry-type:
     description: "Entry type: feature, fix, improvement, breaking, or announcement. Ignored when ai-summarize picks one."
     required: false
