@@ -74,7 +74,7 @@ jobs:
 
 ### Links
 
-- **Documentation:** [deploylog.dev/docs/github-action](https://deploylog.dev/docs/github-action)
+- **Documentation:** [github.com/deploylogdev/action](https://github.com/deploylogdev/action#readme)
 - **Support:** [github.com/deploylogdev/action/issues](https://github.com/deploylogdev/action/issues)
 - **Privacy Policy:** [deploylog.dev/privacy](https://deploylog.dev/privacy)
 - **Terms of Service:** [deploylog.dev/terms](https://deploylog.dev/terms)
