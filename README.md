@@ -82,7 +82,6 @@ jobs:
 ## Links
 
 - [DeployLog](https://deploylog.dev)
-- [Documentation](https://deploylog.dev/docs/github-action)
 - [CLI Tool](https://www.npmjs.com/package/deploylog)
 - [Issues](https://github.com/deploylogdev/action/issues)
 
