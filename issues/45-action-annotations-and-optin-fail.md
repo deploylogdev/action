@@ -20,6 +20,12 @@
 > issue 55 ships the wiring when the endpoint exists. Splitting them keeps a client that would 404 in
 > production, and a second hand-copy of the server contract, out of the repository.
 
+> **Update 2026-08-15 (the note above is kept as written, because it records why this slice was
+> split).** Issue 49 has since **shipped**, so "the mirror tables do not exist" is no longer true, and
+> `deploylog/issues/56` — the endpoint this slice's sibling waits on — went from `blocked` to
+> ready-for-agent on the same day. Nothing changes for *this* issue: it still owns the delivery
+> decisions only, and the wiring is still issue 55. Read the parenthetical above as history.
+
 ## What to build
 
 Drift reaches a developer as an annotation attached to the **changed source line** rather than to the
