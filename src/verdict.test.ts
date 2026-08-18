@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { planAnnotations, type VerificationCounts, type VerificationReportView } from './annotate.js'
+import {
+  ANNOTATION_LIMIT,
+  planAnnotations,
+  type VerificationCounts,
+  type VerificationReportView,
+} from './annotate.js'
 import { DEFAULT_FAIL_ON, decideVerdict, parseFailOn, renderSummary } from './verdict.js'
+
+/** A report with `n` drifted claims, all in this repository, all on their own line. */
+function driftReportOf(n: number): VerificationReportView {
+  return {
+    chapters: [
+      {
+        number: '4',
+        title: 'Plans and pricing',
+        confirmed: Array.from({ length: n }, (_, i) => ({
+          claimId: `claim-${i + 1}`,
+          text: `Claim number ${i + 1}.`,
+          repository: REPO,
+          source: 'src/lib/plan.ts',
+          line: 10 + i,
+          detail: `Detail for claim ${i + 1}.`,
+        })),
+      },
+    ],
+    ...counts({ confirmedCount: n }),
+  }
+}
 
 const REPO = 'deploylogdev/action'
 
@@ -180,5 +206,55 @@ describe('renderSummary', () => {
     const plan = planAnnotations(report, { repository: REPO })
 
     expect(renderSummary(report, plan, decideVerdict(report, 'none'))).toBe('')
+  })
+})
+
+describe('the annotation limit', () => {
+  const summaryFor = (n: number) => {
+    const report = driftReportOf(n)
+    const plan = planAnnotations(report, { repository: REPO })
+    return { plan, summary: renderSummary(report, plan, decideVerdict(report, 'none')) }
+  }
+
+  it('plans every finding, because the limit is a delivery bound and not a rule about findings', () => {
+    // planAnnotations stays complete. Capping there would lose the findings before
+    // anything could report them, which is the defect rather than the fix.
+    expect(planAnnotations(driftReportOf(15), { repository: REPO }).annotations).toHaveLength(15)
+  })
+
+  it('says how many of how many were shown once the limit is passed', () => {
+    const { summary } = summaryFor(ANNOTATION_LIMIT + 5)
+    expect(summary).toContain(`${ANNOTATION_LIMIT} of ${ANNOTATION_LIMIT + 5}`)
+  })
+
+  it('lists every finding past the limit, with its line and detail', () => {
+    const n = ANNOTATION_LIMIT + 3
+    const { summary } = summaryFor(n)
+    // The three that GitHub will not render are the ones a reader has no other
+    // way to see, so each must appear whole.
+    for (const i of [n - 2, n - 1, n]) {
+      expect(summary).toContain(`Claim number ${i}.`)
+      expect(summary).toContain(`Detail for claim ${i}.`)
+      expect(summary).toContain(`src/lib/plan.ts:${10 + i - 1}`)
+    }
+  })
+
+  it('does not list the findings that were shown inline', () => {
+    // They are on the line already. Repeating them is how a summary becomes noise.
+    const { summary } = summaryFor(ANNOTATION_LIMIT + 2)
+    expect(summary).not.toContain('Claim number 1.')
+  })
+
+  it('is unchanged at exactly the limit', () => {
+    const { summary } = summaryFor(ANNOTATION_LIMIT)
+    expect(summary).toContain(`${ANNOTATION_LIMIT} findings annotated inline`)
+    expect(summary).not.toContain(' of ')
+    expect(summary).not.toContain('not shown inline')
+  })
+
+  it('is still silent on a clean run', () => {
+    const report = driftReportOf(0)
+    const plan = planAnnotations(report, { repository: REPO })
+    expect(renderSummary(report, plan, decideVerdict(counts(), 'none'))).toBe('')
   })
 })

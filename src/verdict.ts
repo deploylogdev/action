@@ -16,6 +16,7 @@
 // settings select which signals fail the check; they never merge them, and both
 // are reported whichever setting is in force.
 
+import { ANNOTATION_LIMIT } from './annotate.js'
 import type { AnnotationPlan, VerificationCounts, VerificationReportView } from './annotate.js'
 
 export const FAIL_ON_VALUES = ['none', 'drift', 'any'] as const
@@ -133,12 +134,33 @@ export function renderSummary(
   const lines: string[] = ['## DeployLog manual check', '']
 
   if (verdict.drift > 0) {
+    const shown = Math.min(plan.annotations.length, ANNOTATION_LIMIT)
+    const overflow = plan.annotations.slice(ANNOTATION_LIMIT)
+
     lines.push(
-      `**Drift: ${plural(verdict.drift, 'claim')} no longer match the code.**`,
+      `**Drift: ${plural(verdict.drift, 'claim')} no longer ${verdict.drift === 1 ? 'matches' : 'match'} the code.**`,
       '',
-      `${plural(plan.annotations.length, 'finding')} annotated inline on the changed lines.`,
+      overflow.length > 0
+        ? `${shown} of ${plan.annotations.length} findings annotated inline on the changed lines; GitHub renders no more than ${ANNOTATION_LIMIT} per run.`
+        : `${plural(shown, 'finding')} annotated inline on the changed lines.`,
       '',
     )
+
+    // Everything past the limit, whole. These are the findings with no other
+    // surface: they were placed correctly, on lines inside the diff, and GitHub
+    // will simply not draw them. A run that bounds what it shows has to say what
+    // it dropped, or the bound reads as coverage.
+    if (overflow.length > 0) {
+      lines.push(
+        `### ${plural(overflow.length, 'finding')} not shown inline`,
+        '',
+        ...overflow.map(
+          (annotation) =>
+            `- \`${annotation.file}:${annotation.line}\`: ${annotation.message.split('\n').filter(Boolean).join(' ')}`,
+        ),
+        '',
+      )
+    }
   } else {
     lines.push('**No drift found.**', '')
   }
