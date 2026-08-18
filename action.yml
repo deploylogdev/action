@@ -65,7 +65,7 @@ outputs:
   low-coverage-chapters:
     description: Verify mode. Comma-separated chapter numbers carrying claims over too little of their own prose.
   check-failed:
-    description: Verify mode. Whether fail-on escalated this run to a failure (true/false).
+    description: Verify mode. Whether this run failed the check (true/false). The count outputs above are empty when the run could not reach DeployLog at all, because this run received no report to count.
 
 runs:
   using: node20

@@ -1,6 +1,6 @@
 # 55 — Manual verify mode: transport, changed files, and the real pull-request arm
 
-**Status:** in-progress · **Type:** AFK · **Lane:** deploylog-action
+**Status:** blocked (observable arm only) · **Type:** AFK · **Lane:** deploylog-action
 **Parent:** ../deploylog/issues/prd-manual.md *(PRD lives in the deploylog repo)*
 **Blocked by:** ~~`../deploylog/issues/56`~~ — cleared 2026-08-18. deploylog PRs #54 and #55 merged;
 `src/app/api/cli/manual/verify/route.ts` is live on `main` (`9bedc81`), confirmed against
@@ -78,6 +78,64 @@ checked field-by-field and needed no change.
 **Not verified, and it is the whole observable arm:** nothing here has run against the live endpoint.
 Criterion 1 needs a scratch pull request on a repository with a DeployLog project, a manual, a
 connected repository, and `DEPLOYLOG_API_KEY` in secrets. Target: `marko-builds/deploylog`.
+
+## Review pass — 2026-08-18
+
+`/review-diff` over `328072f`, two axes. Fixed in the follow-up commit:
+
+- **An empty changed-file list was trusted**, so the server evaluated no claim and the run was
+  byte-identical to a verified-clean manual. `collectChangedPaths` now returns a discriminated
+  `untrusted` result for both the cap and the empty case, each with its own warning.
+- **A pull-request payload with no head sha silently sent the merge commit** — the one ref this
+  slice exists to avoid, and the fallback was invisible. `toWorkflowRun` throws instead, and the
+  narrowing moved out of `main.ts` into a tested function.
+- **The `drift > 0` half of the annotation level was inert**, not merely untested: annotations are
+  built only from confirmed findings and `drift` IS that count, so no state could distinguish it. A
+  mutation removing it left every test green. Deleted, with its comment.
+- **`unverifiable` had become readable inside `runVerify`** through the wide wire type, defeating the
+  safeguard `annotate.ts:18-22` describes. The report is narrowed to `VerificationReportView` on
+  arrival, so the field is unnameable again.
+- **`check-failed` was unset on the transport-failure path**, inverting a downstream
+  `!= 'false'` guard. Now set; the counts stay unset deliberately, since a zero would be a claim
+  about a manual this run never received.
+- **The job-summary write was unguarded** — a runner without `GITHUB_STEP_SUMMARY` turned a green run
+  red. Caught and downgraded to a warning.
+- **Secret masking sat behind two throwable statements.** Both secrets are masked immediately after
+  reading now, calibrated against two mutants: removing the mask and moving it back after validation
+  each turn the new test red.
+- **The typecheck gate could not see test files** (`tsconfig.json` excluded them), so the two
+  required-field additions this slice made were outside its scope. Exclusion removed; calibrated by
+  planting a logger missing `annotate`, which the widened gate catches and `vitest` alone does not.
+- A comment claiming a `skip-prerelease` env leak: **no test ever set it**. The rationale was
+  invented; corrected to what is actually true.
+
+**Decided:** `fail-on: none` keeps failing on transport errors, and the README was the wrong half.
+`none` selects which *findings* fail the check; it never means the check cannot fail. A run that
+could not reach DeployLog has vouched for nothing, and green would be the false clean this slice is
+arranged against.
+
+**Recorded, not fixed — this threatens criterion 1 more than the out-of-hunk risk below.** GitHub
+renders at most **10 annotations per level per step**. A pull request with 15 drifted claims emits
+15 `core.warning` calls, shows 10, and drops 5 with no error; the summary would say "15 findings
+annotated inline" while listing none of them, because `renderSummary` deliberately excludes
+annotated findings. Measure the real cap on the scratch run before deciding. The fix, if needed,
+lands in `verdict.ts` — which this issue's Boundaries fence off, so it is issue 45 territory and
+needs its own slice.
+
+## Observable arm: deferred, and why
+
+Criterion 1 cannot run today, and the blocker is not in this repo. The Manual feature's **entire
+schema is unapplied in production**: `20260815000000_connected_repositories`,
+`20260815010000_manual_mirror_tables` and `20260815020000_manual_chapter_approval` have never been
+run against the live database. There is no `connected_repositories` table to connect a repository
+in, and no `manual_versions` for a working version to live in, so `getWorkingVersion` cannot
+succeed. The endpoint answers 401 rather than 404 only because Next.js routes it.
+
+Decided 2026-08-18: **the arm waits for the Manual feature's own launch** rather than applying an
+unlaunched feature's schema to production to unblock a test. Nothing about the arm expires. When
+the schema ships, the setup is: an API key with `read`, connect `marko-builds/deploylog`
+(installation id **153878377**), a manual chapter citing `src/lib/plan.ts`'s `FREE_PROJECT_LIMIT`,
+then a scratch pull request changing that constant.
 
 ## Carried forward from issue 45
 

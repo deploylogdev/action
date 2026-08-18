@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readInputs } from './inputs.js'
 
 const INPUT_KEYS = [
@@ -8,9 +8,9 @@ const INPUT_KEYS = [
   'INPUT_NOTIFY-SUBSCRIBERS',
   'INPUT_ENTRY-TYPE',
   'INPUT_API-URL',
-  // skip-prerelease was already missing here, so a test that set it leaked into
-  // every test after it. Added with the new keys rather than left as a trap the
-  // mode tests below would have been the next to hit.
+  // skip-prerelease has no test that sets it today, so nothing has leaked; it is
+  // listed because every other input is, and an unlisted key is a trap for
+  // whoever adds that test.
   'INPUT_SKIP-PRERELEASE',
   'INPUT_MODE',
   'INPUT_FAIL-ON',
@@ -44,6 +44,25 @@ describe('readInputs', () => {
       apiUrl: 'https://deploylog.dev',
       skipPrerelease: false,
     })
+  })
+
+  it('masks both secret-bearing inputs before any validation can throw', () => {
+    const writes: string[] = []
+    const spy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: unknown) => (writes.push(String(chunk)), true))
+    setEnv({
+      'api-key': 'dk_abc',
+      project: 'my-app',
+      'github-token': 'ghs_tokenvalue',
+      // Invalid on purpose: readInputs throws on this, and the masks must
+      // already be in place when it does.
+      mode: 'nonsense',
+    })
+    expect(() => readInputs()).toThrow(/Invalid mode/)
+    spy.mockRestore()
+    expect(writes.join('')).toContain('::add-mask::dk_abc')
+    expect(writes.join('')).toContain('::add-mask::ghs_tokenvalue')
   })
 
   it('parses mode and fail-on', () => {

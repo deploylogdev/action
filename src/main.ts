@@ -4,13 +4,12 @@ import { readInputs } from './inputs.js'
 import { run } from './run.js'
 import type { ActionLogger } from './run.js'
 import type { ReleasePayload } from './release.js'
-import type { ListPullRequestFiles, VerifyContext } from './verify-context.js'
-import { resolveVerifyContext } from './verify-context.js'
-
-interface PullRequestPayload {
-  number: number
-  head?: { sha?: string }
-}
+import type {
+  ListPullRequestFiles,
+  PullRequestPayload,
+  VerifyContext,
+} from './verify-context.js'
+import { resolveVerifyContext, toWorkflowRun } from './verify-context.js'
 
 function makeLogger(): ActionLogger {
   return {
@@ -29,7 +28,17 @@ function makeLogger(): ActionLogger {
       else core.warning(annotation.message, properties)
     },
     summary: async (markdown) => {
-      await core.summary.addRaw(markdown).write()
+      // A runner without GITHUB_STEP_SUMMARY (self-hosted, `act`) makes this
+      // reject, and an unguarded await would turn a green run red over a place
+      // to write the report rather than over anything in the manual.
+      try {
+        await core.summary.addRaw(markdown).write()
+      } catch (err) {
+        core.warning(
+          `Could not write the job summary (${err instanceof Error ? err.message : String(err)}). ` +
+            'The findings above are the full report for this run.',
+        )
+      }
     },
   }
 }
@@ -45,7 +54,6 @@ function makeLogger(): ActionLogger {
 async function buildVerifyContext(githubToken: string): Promise<VerifyContext> {
   const { owner, repo } = github.context.repo
   const pr = github.context.payload.pull_request as PullRequestPayload | undefined
-  const headSha = pr?.head?.sha ?? null
 
   const listFiles: ListPullRequestFiles | null = githubToken
     ? async (pullNumber) => {
@@ -59,16 +67,17 @@ async function buildVerifyContext(githubToken: string): Promise<VerifyContext> {
       }
     : null
 
-  return resolveVerifyContext(
-    {
-      repository: `${owner}/${repo}`,
-      eventName: github.context.eventName,
-      sha: github.context.sha,
-      pullRequest: pr && headSha ? { number: pr.number, headSha } : null,
-    },
-    listFiles,
-    { info: (msg) => core.info(msg), warning: (msg) => core.warning(msg) },
-  )
+  const run = toWorkflowRun({
+    repository: `${owner}/${repo}`,
+    eventName: github.context.eventName,
+    sha: github.context.sha,
+    pullRequest: pr,
+  })
+
+  return resolveVerifyContext(run, listFiles, {
+    info: (msg) => core.info(msg),
+    warning: (msg) => core.warning(msg),
+  })
 }
 
 async function main(): Promise<void> {

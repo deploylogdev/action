@@ -36,10 +36,18 @@ export interface ActionInputs {
 
 export function readInputs(): ActionInputs {
   const apiKey = core.getInput('api-key', { required: true }).trim()
+  // Masked here rather than after validation. BUG-016's point is that the value
+  // may have been pasted as a literal instead of wired through `secrets.*`, and
+  // every validation below can throw — a throw before the mask is a throw with an
+  // unmasked secret already in the process.
+  core.setSecret(apiKey)
+
+  const githubToken = core.getInput('github-token').trim()
+  if (githubToken) core.setSecret(githubToken)
+
   const project = core.getInput('project', { required: true }).trim()
   const modeRaw = (core.getInput('mode') || 'publish').trim().toLowerCase()
   const failOn = parseFailOn(core.getInput('fail-on'))
-  const githubToken = core.getInput('github-token').trim()
   const aiSummarize = readBool('ai-summarize', false)
   const notifySubscribers = readBool('notify-subscribers', false)
   const skipPrerelease = readBool('skip-prerelease', false)
@@ -50,15 +58,9 @@ export function readInputs(): ActionInputs {
     throw new Error('Invalid api-key. Keys issued by DeployLog start with "dk_".')
   }
 
-  // Defensively mask the key in logs even if the caller passed a literal instead
-  // of wiring it through ${{ secrets.* }}. (BUG-016)
-  core.setSecret(apiKey)
-
   if (!isMode(modeRaw)) {
     throw new Error(`Invalid mode "${modeRaw}". Must be one of: ${MODES.join(', ')}`)
   }
-
-  if (githubToken) core.setSecret(githubToken)
 
   if (!isEntryType(entryTypeRaw)) {
     throw new Error(

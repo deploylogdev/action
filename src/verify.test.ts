@@ -191,6 +191,29 @@ describe('runVerify', () => {
     expect(h.outputs['drift-count']).toBe('0')
   })
 
+  it('names the not-clean reasons in the console line, not just the drift count', async () => {
+    // `fail-on: none` keeps the check green, and the one line a green check shows
+    // first must not read as a clean bill of health when two claims were unreadable.
+    const h = runWith(report({ errorCount: 2, unverifiable: true }), 'none')
+    await h.done
+    expect(h.failures).toEqual([])
+    expect(h.messages.join('\n')).toContain('could not vouch')
+  })
+
+  it('still reports check-failed when the endpoint is unreachable', async () => {
+    const harness = makeLogger()
+    const verifyManual = vi.fn().mockRejectedValue(new Error('429 rate limited'))
+    const clientFactory = () =>
+      ({ verifyManual }) as unknown as ReturnType<typeof import('./api.js').createApiClient>
+    await runVerify({ inputs: inputs('none'), context, logger: harness.logger, clientFactory })
+    // `none` means no FINDING fails the check, never that the check cannot fail.
+    expect(harness.failures).toHaveLength(1)
+    expect(harness.outputs['check-failed']).toBe('true')
+    // The counts stay unset: a zero here would be a claim about the manual, and
+    // this run never received one.
+    expect(harness.outputs['drift-count']).toBeUndefined()
+  })
+
   it('fails the check when the endpoint does', async () => {
     const harness = makeLogger()
     const verifyManual = vi.fn().mockRejectedValue(new Error("Project 'my-app' has no manual to verify"))

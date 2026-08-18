@@ -25620,10 +25620,12 @@ var ENTRY_TYPES = [
 var MODES = ["publish", "verify"];
 function readInputs() {
   const apiKey = core.getInput("api-key", { required: true }).trim();
+  core.setSecret(apiKey);
+  const githubToken = core.getInput("github-token").trim();
+  if (githubToken) core.setSecret(githubToken);
   const project = core.getInput("project", { required: true }).trim();
   const modeRaw = (core.getInput("mode") || "publish").trim().toLowerCase();
   const failOn = parseFailOn(core.getInput("fail-on"));
-  const githubToken = core.getInput("github-token").trim();
   const aiSummarize = readBool("ai-summarize", false);
   const notifySubscribers = readBool("notify-subscribers", false);
   const skipPrerelease = readBool("skip-prerelease", false);
@@ -25632,11 +25634,9 @@ function readInputs() {
   if (!apiKey.startsWith("dk_")) {
     throw new Error('Invalid api-key. Keys issued by DeployLog start with "dk_".');
   }
-  core.setSecret(apiKey);
   if (!isMode(modeRaw)) {
     throw new Error(`Invalid mode "${modeRaw}". Must be one of: ${MODES.join(", ")}`);
   }
-  if (githubToken) core.setSecret(githubToken);
   if (!isEntryType(entryTypeRaw)) {
     throw new Error(
       `Invalid entry-type "${entryTypeRaw}". Must be one of: ${ENTRY_TYPES.join(", ")}`
@@ -25826,20 +25826,22 @@ async function runVerify(opts) {
     changedFiles: context2.changedFiles
   }).catch((err) => err instanceof Error ? err : new Error(String(err)));
   if (report instanceof Error) {
+    logger.setOutput("check-failed", "true");
     logger.setFailed(`Could not verify the manual: ${report.message}`);
     return;
   }
-  const plan = planAnnotations(report, { repository: context2.repository });
-  const verdict = decideVerdict(report, inputs.failOn);
-  const level = verdict.failed && verdict.drift > 0 ? "error" : "warning";
+  const view = report;
+  const plan = planAnnotations(view, { repository: context2.repository });
+  const verdict = decideVerdict(view, inputs.failOn);
+  const level = verdict.failed ? "error" : "warning";
   for (const annotation of plan.annotations) logger.annotate(annotation, level);
   logger.setOutput("drift-count", String(verdict.drift));
-  logger.setOutput("error-count", String(report.errorCount));
-  logger.setOutput("unanchored-count", String(report.unanchoredCount));
-  logger.setOutput("untriggered-count", String(report.untriggeredCount));
-  logger.setOutput("low-coverage-chapters", report.lowCoverageChapters.join(","));
+  logger.setOutput("error-count", String(view.errorCount));
+  logger.setOutput("unanchored-count", String(view.unanchoredCount));
+  logger.setOutput("untriggered-count", String(view.untriggeredCount));
+  logger.setOutput("low-coverage-chapters", view.lowCoverageChapters.join(","));
   logger.setOutput("check-failed", String(verdict.failed));
-  const summary2 = renderSummary(report, plan, verdict);
+  const summary2 = renderSummary(view, plan, verdict);
   if (summary2) await logger.summary(summary2);
   if (verdict.failed) {
     logger.setFailed(verdict.failure ?? "Manual check failed.");
@@ -25849,8 +25851,9 @@ async function runVerify(opts) {
     logger.info("Manual check: no drift, and nothing this run could not vouch for.");
     return;
   }
+  const notClean = verdict.reasons.length ? ` ${verdict.reasons.length} reason${verdict.reasons.length === 1 ? "" : "s"} this run could not vouch for the manual (see the job summary).` : "";
   logger.info(
-    `Manual check: ${verdict.drift} drifted, ${plan.annotations.length} annotated inline. The check is green because escalation is off.`
+    `Manual check: ${verdict.drift} drifted, ${plan.annotations.length} annotated inline.${notClean} The check is green because escalation is off.`
   );
 }
 
@@ -25953,13 +25956,29 @@ var FULL_SHA = /^[0-9a-f]{40}$/;
 var CHANGED_FILE_CAP = 3e3;
 async function collectChangedPaths(listFiles, pullNumber) {
   const files = await listFiles(pullNumber);
-  if (files.length >= CHANGED_FILE_CAP) return null;
+  if (files.length >= CHANGED_FILE_CAP) return { kind: "untrusted", reason: "cap" };
+  if (files.length === 0) return { kind: "untrusted", reason: "empty" };
   const paths = /* @__PURE__ */ new Set();
   for (const file of files) {
     paths.add(file.filename);
     if (file.previous_filename) paths.add(file.previous_filename);
   }
-  return [...paths];
+  return { kind: "paths", paths: [...paths] };
+}
+function toWorkflowRun(event) {
+  const pr = event.pullRequest;
+  const headSha = pr?.head?.sha;
+  if (pr && !headSha) {
+    throw new Error(
+      `This \`${event.eventName}\` payload carries pull request #${pr.number} with no head sha. Refusing to fall back to the merge commit: findings computed there land on lines outside the pull request's diff, and GitHub drops those annotations without reporting anything.`
+    );
+  }
+  return {
+    repository: event.repository,
+    eventName: event.eventName,
+    sha: event.sha,
+    pullRequest: pr && headSha ? { number: pr.number, headSha } : null
+  };
 }
 async function resolveVerifyContext(run2, listFiles, logger) {
   const ref = run2.pullRequest ? run2.pullRequest.headSha : run2.sha;
@@ -25984,23 +26003,29 @@ async function resolveChangedFiles(run2, listFiles, logger) {
     );
     return null;
   }
-  let paths;
+  let result;
   try {
-    paths = await collectChangedPaths(listFiles, run2.pullRequest.number);
+    result = await collectChangedPaths(listFiles, run2.pullRequest.number);
   } catch (err) {
     logger.warning(
       `Could not read the files of pull request #${run2.pullRequest.number} (${err instanceof Error ? err.message : String(err)}). Verifying the whole manual.`
     );
     return null;
   }
-  if (paths === null) {
-    logger.warning(
-      `Pull request #${run2.pullRequest.number} touches at least ${CHANGED_FILE_CAP} files, which is where GitHub stops listing them. Verifying the whole manual rather than a partial list.`
-    );
+  if (result.kind === "untrusted") {
+    logger.warning(`${untrustedMessage(result.reason, run2.pullRequest.number)} Verifying the whole manual.`);
     return null;
   }
-  logger.info(`Verifying claims that cite any of the ${paths.length} files this pull request changes.`);
-  return paths;
+  logger.info(
+    `Verifying claims that cite any of the ${result.paths.length} files this pull request changes.`
+  );
+  return result.paths;
+}
+function untrustedMessage(reason, pullNumber) {
+  if (reason === "cap") {
+    return `Pull request #${pullNumber} touches at least ${CHANGED_FILE_CAP} files, which is where GitHub stops listing them, so the list would be partial.`;
+  }
+  return `Pull request #${pullNumber} reports no changed files, so there is nothing to scope the check to. Scoping to an empty list would evaluate no claim at all and report a clean manual.`;
 }
 
 // src/main.ts
@@ -26021,14 +26046,19 @@ function makeLogger() {
       else core2.warning(annotation.message, properties);
     },
     summary: async (markdown) => {
-      await core2.summary.addRaw(markdown).write();
+      try {
+        await core2.summary.addRaw(markdown).write();
+      } catch (err) {
+        core2.warning(
+          `Could not write the job summary (${err instanceof Error ? err.message : String(err)}). The findings above are the full report for this run.`
+        );
+      }
     }
   };
 }
 async function buildVerifyContext(githubToken) {
   const { owner, repo } = github.context.repo;
   const pr = github.context.payload.pull_request;
-  const headSha = pr?.head?.sha ?? null;
   const listFiles = githubToken ? async (pullNumber) => {
     const octokit = github.getOctokit(githubToken);
     return octokit.paginate(octokit.rest.pulls.listFiles, {
@@ -26038,16 +26068,16 @@ async function buildVerifyContext(githubToken) {
       per_page: 100
     });
   } : null;
-  return resolveVerifyContext(
-    {
-      repository: `${owner}/${repo}`,
-      eventName: github.context.eventName,
-      sha: github.context.sha,
-      pullRequest: pr && headSha ? { number: pr.number, headSha } : null
-    },
-    listFiles,
-    { info: (msg) => core2.info(msg), warning: (msg) => core2.warning(msg) }
-  );
+  const run2 = toWorkflowRun({
+    repository: `${owner}/${repo}`,
+    eventName: github.context.eventName,
+    sha: github.context.sha,
+    pullRequest: pr
+  });
+  return resolveVerifyContext(run2, listFiles, {
+    info: (msg) => core2.info(msg),
+    warning: (msg) => core2.warning(msg)
+  });
 }
 async function main() {
   try {

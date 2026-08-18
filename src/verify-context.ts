@@ -34,6 +34,17 @@ export interface PullRequestFile {
   previous_filename?: string
 }
 
+/**
+ * Why a file list could not be used. Named rather than collapsed into `null`,
+ * because the two cases need different words in the log: at the cap the list is
+ * too long to trust, and at zero there is nothing to scope to at all.
+ */
+export type UntrustedReason = 'cap' | 'empty'
+
+export type ChangedPathsResult =
+  | { kind: 'paths'; paths: string[] }
+  | { kind: 'untrusted'; reason: UntrustedReason }
+
 export interface WorkflowRun {
   /** `owner/repo` for the repository this workflow is running in. */
   repository: string
@@ -41,6 +52,19 @@ export interface WorkflowRun {
   /** `github.context.sha`. On a pull request this is the merge commit. */
   sha: string
   pullRequest: { number: number; headSha: string } | null
+}
+
+/** The pull request as the event payload carries it, before any narrowing. */
+export interface PullRequestPayload {
+  number: number
+  head?: { sha?: string }
+}
+
+export interface WorkflowEvent {
+  repository: string
+  eventName: string
+  sha: string
+  pullRequest: PullRequestPayload | undefined
 }
 
 export interface VerifyContext {
@@ -66,16 +90,49 @@ export type ListPullRequestFiles = (pullNumber: number) => Promise<PullRequestFi
 export async function collectChangedPaths(
   listFiles: ListPullRequestFiles,
   pullNumber: number,
-): Promise<string[] | null> {
+): Promise<ChangedPathsResult> {
   const files = await listFiles(pullNumber)
-  if (files.length >= CHANGED_FILE_CAP) return null
+  if (files.length >= CHANGED_FILE_CAP) return { kind: 'untrusted', reason: 'cap' }
+  // An empty list is the sharpest false-clean there is: the server evaluates no
+  // claim, every chapter comes back CLEAR, and the run is byte-identical to one
+  // that verified the whole manual and found nothing. Zero is not a scope.
+  if (files.length === 0) return { kind: 'untrusted', reason: 'empty' }
 
   const paths = new Set<string>()
   for (const file of files) {
     paths.add(file.filename)
     if (file.previous_filename) paths.add(file.previous_filename)
   }
-  return [...paths]
+  return { kind: 'paths', paths: [...paths] }
+}
+
+/**
+ * The event payload, narrowed to a run.
+ *
+ * Throws rather than degrading when a payload carries a pull request with no
+ * head sha. The tempting fallback is `context.sha`, and on a pull request that
+ * is the synthesised merge commit — the one ref this module exists to avoid
+ * sending. Degrading would do it silently, and the run would report findings
+ * that never render as annotations with nothing in the log to say why.
+ */
+export function toWorkflowRun(event: WorkflowEvent): WorkflowRun {
+  const pr = event.pullRequest
+  const headSha = pr?.head?.sha
+
+  if (pr && !headSha) {
+    throw new Error(
+      `This \`${event.eventName}\` payload carries pull request #${pr.number} with no head sha. ` +
+        'Refusing to fall back to the merge commit: findings computed there land on lines outside ' +
+        "the pull request's diff, and GitHub drops those annotations without reporting anything.",
+    )
+  }
+
+  return {
+    repository: event.repository,
+    eventName: event.eventName,
+    sha: event.sha,
+    pullRequest: pr && headSha ? { number: pr.number, headSha } : null,
+  }
 }
 
 export async function resolveVerifyContext(
@@ -119,9 +176,9 @@ async function resolveChangedFiles(
     return null
   }
 
-  let paths: string[] | null
+  let result: ChangedPathsResult
   try {
-    paths = await collectChangedPaths(listFiles, run.pullRequest.number)
+    result = await collectChangedPaths(listFiles, run.pullRequest.number)
   } catch (err) {
     logger.warning(
       `Could not read the files of pull request #${run.pullRequest.number} ` +
@@ -130,14 +187,26 @@ async function resolveChangedFiles(
     return null
   }
 
-  if (paths === null) {
-    logger.warning(
-      `Pull request #${run.pullRequest.number} touches at least ${CHANGED_FILE_CAP} files, which is ` +
-        'where GitHub stops listing them. Verifying the whole manual rather than a partial list.',
-    )
+  if (result.kind === 'untrusted') {
+    logger.warning(`${untrustedMessage(result.reason, run.pullRequest.number)} Verifying the whole manual.`)
     return null
   }
 
-  logger.info(`Verifying claims that cite any of the ${paths.length} files this pull request changes.`)
-  return paths
+  logger.info(
+    `Verifying claims that cite any of the ${result.paths.length} files this pull request changes.`,
+  )
+  return result.paths
+}
+
+function untrustedMessage(reason: UntrustedReason, pullNumber: number): string {
+  if (reason === 'cap') {
+    return (
+      `Pull request #${pullNumber} touches at least ${CHANGED_FILE_CAP} files, which is where GitHub ` +
+      'stops listing them, so the list would be partial.'
+    )
+  }
+  return (
+    `Pull request #${pullNumber} reports no changed files, so there is nothing to scope the check to. ` +
+    'Scoping to an empty list would evaluate no claim at all and report a clean manual.'
+  )
 }
