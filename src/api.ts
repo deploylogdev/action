@@ -60,7 +60,7 @@ export interface ApiClientConfig {
 
 export function createApiClient(config: ApiClientConfig) {
   const fetchFn = config.fetchFn ?? fetch
-  const userAgent = config.userAgent ?? 'deploylog-action/1.0'
+  const userAgent = config.userAgent ?? 'deploylog-action/1.2'
 
   async function request<T>(path: string, init: RequestInit): Promise<T> {
     const res = await fetchFn(`${config.baseUrl}${path}`, {

@@ -25682,7 +25682,7 @@ var ApiError = class extends Error {
 };
 function createApiClient(config) {
   const fetchFn = config.fetchFn ?? fetch;
-  const userAgent = config.userAgent ?? "deploylog-action/1.0";
+  const userAgent = config.userAgent ?? "deploylog-action/1.2";
   async function request(path, init) {
     const res = await fetchFn(`${config.baseUrl}${path}`, {
       ...init,
