@@ -8,6 +8,13 @@ const INPUT_KEYS = [
   'INPUT_NOTIFY-SUBSCRIBERS',
   'INPUT_ENTRY-TYPE',
   'INPUT_API-URL',
+  // skip-prerelease was already missing here, so a test that set it leaked into
+  // every test after it. Added with the new keys rather than left as a trap the
+  // mode tests below would have been the next to hit.
+  'INPUT_SKIP-PRERELEASE',
+  'INPUT_MODE',
+  'INPUT_FAIL-ON',
+  'INPUT_GITHUB-TOKEN',
 ]
 
 function setEnv(inputs: Record<string, string>): void {
@@ -28,12 +35,32 @@ describe('readInputs', () => {
     expect(inputs).toEqual({
       apiKey: 'dk_abc',
       project: 'my-app',
+      mode: 'publish',
+      failOn: 'none',
+      githubToken: '',
       aiSummarize: false,
       notifySubscribers: false,
       entryType: 'feature',
       apiUrl: 'https://deploylog.dev',
       skipPrerelease: false,
     })
+  })
+
+  it('parses mode and fail-on', () => {
+    setEnv({ 'api-key': 'dk_abc', project: 'my-app', mode: 'VERIFY', 'fail-on': 'Drift' })
+    const inputs = readInputs()
+    expect(inputs.mode).toBe('verify')
+    expect(inputs.failOn).toBe('drift')
+  })
+
+  it('rejects an unknown mode', () => {
+    setEnv({ 'api-key': 'dk_abc', project: 'my-app', mode: 'check' })
+    expect(() => readInputs()).toThrow(/Invalid mode "check"/)
+  })
+
+  it('rejects an unknown fail-on', () => {
+    setEnv({ 'api-key': 'dk_abc', project: 'my-app', 'fail-on': 'always' })
+    expect(() => readInputs()).toThrow(/Invalid value for fail-on/)
   })
 
   it('parses boolean inputs', () => {

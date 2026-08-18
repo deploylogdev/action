@@ -1,9 +1,10 @@
 # 55 — Manual verify mode: transport, changed files, and the real pull-request arm
 
-**Status:** blocked · **Type:** AFK · **Lane:** deploylog-action
+**Status:** in-progress · **Type:** AFK · **Lane:** deploylog-action
 **Parent:** ../deploylog/issues/prd-manual.md *(PRD lives in the deploylog repo)*
-**Blocked by:** `../deploylog/issues/56` (the verify endpoint), which is itself blocked by
-`../deploylog/issues/49` (mirror tables). Out-of-repo dependencies this repo's DAG cannot see.
+**Blocked by:** ~~`../deploylog/issues/56`~~ — cleared 2026-08-18. deploylog PRs #54 and #55 merged;
+`src/app/api/cli/manual/verify/route.ts` is live on `main` (`9bedc81`), confirmed against
+`git ls-remote`, not a local tracking ref.
 **Verification:** PRD assertions 1 and 2, observable. A scratch pull request that changes a cited constant shows the annotation inline; with escalation off the check is green and the finding is still visible.
 
 The half of issue 45 that could not be built when 45 was built. 45 shipped the delivery decisions as
@@ -30,11 +31,53 @@ them to a real run.
 ## Acceptance criteria
 
 - [ ] A scratch pull request changing a cited constant shows the annotation inline on the changed line.
-- [ ] With `fail-on: none` the check is green and the finding is still visible in the output.
-- [ ] With `fail-on: drift` the same finding fails the check.
-- [ ] With `fail-on: any` a run with errors and no drift fails the check.
-- [ ] A run with no findings is silent: no annotations, no job summary.
-- [ ] An existing `release`-triggered workflow is unaffected by the upgrade.
+- [~] With `fail-on: none` the check is green and the finding is still visible in the output.
+      Decided and tested (`verify.test.ts`); "visible" is only observable on the real run.
+- [x] With `fail-on: drift` the same finding fails the check. (`verify.test.ts`)
+- [x] With `fail-on: any` a run with errors and no drift fails the check. (`verify.test.ts`)
+- [x] A run with no findings is silent: no annotations, no job summary. (`verify.test.ts`)
+- [x] An existing `release`-triggered workflow is unaffected by the upgrade. (`run.test.ts`,
+      `inputs.test.ts` — the default mode is `publish` and a release payload present in verify mode
+      is ignored rather than double-handled.)
+
+## Run record — 2026-08-18
+
+Built: `verifyManual` in `src/api.ts` over a mirror of `ManualVerifyRequestSchema` /
+`ManualVerifyResponseSchema`; `src/verify-context.ts` (ref and changed-file resolution);
+`src/verify.ts` (the run); mode dispatch in `src/run.ts`; the `core.*` edge in `src/main.ts`;
+`action.yml` inputs and outputs; a README section with the workflow snippet. 76 tests pass,
+`npm run package` clean, `dist/index.js` rebuilt from that run.
+
+**Changed files come from the pull-request files API**, not a git diff, so the workflow needs no
+`actions/checkout` and no `fetch-depth`. It needs `permissions: pull-requests: read` and
+`github-token: ${{ github.token }}`. Without the token the run verifies the whole manual and says
+so; that is the same fallback used when the event is not a pull request, and when the file list hits
+GitHub's 3000-file listing cap. An incomplete file list under-scopes claims and reports a clean
+manual over real drift, so every path that cannot produce a trustworthy list resolves to `null`
+(full sweep) rather than to a partial one.
+
+**The ref is `pull_request.head.sha`, never `context.sha`.** On a pull request `context.sha` is the
+synthesised merge commit; the server re-pins this repository to whatever ref it is sent and reports
+`finding.line` at that ref, and GitHub drops annotations for lines outside the diff hunks, which are
+computed at the head. `resolveVerifyContext` throws rather than sending anything that is not a
+40-character sha.
+
+**The fourth criterion was constructed so it can only fail for the reason it names.** Against a real
+multi-repository manual, `fail-on: any` fails on `untriggeredCount` alone
+(`../deploylog/wiki/decisions/verify-runs-at-the-run-ref.md` §3), so an arm built on a live report
+would pass whether or not the error path works. The arm pins every other not-clean signal to zero and
+asserts it, its known negative (the same report under `fail-on: drift`) is green, and a sibling arm
+proves an untriggered-only failure is attributed to untriggered and not to errors.
+
+**Also corrected:** `src/annotate.ts`'s source-of-truth comment named
+`src/lib/manual-verification.ts`. The wire contract is `ManualVerifyResponseSchema` in
+`src/lib/schemas.ts`; the route validates against it on the way out precisely so the service type may
+differ, which makes the service type the wrong thing to mirror. `VerificationReportView` itself was
+checked field-by-field and needed no change.
+
+**Not verified, and it is the whole observable arm:** nothing here has run against the live endpoint.
+Criterion 1 needs a scratch pull request on a repository with a DeployLog project, a manual, a
+connected repository, and `DEPLOYLOG_API_KEY` in secrets. Target: `marko-builds/deploylog`.
 
 ## Carried forward from issue 45
 

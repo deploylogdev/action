@@ -26,9 +26,12 @@ jobs:
 |-------|----------|---------|-------------|
 | `api-key` | Yes | — | Your DeployLog API key ([get one here](https://deploylog.dev/dashboard/api-keys)) |
 | `project` | Yes | — | Project slug from your DeployLog dashboard |
+| `mode` | No | `publish` | `publish` a release as a changelog entry, or `verify` your manual against the code it cites |
 | `ai-summarize` | No | `false` | Rewrite release notes for end users using AI |
 | `notify-subscribers` | No | `false` | Send email digest to subscribers on publish |
 | `entry-type` | No | `feature` | Entry type: `feature`, `fix`, `improvement`, `breaking`, `announcement` |
+| `fail-on` | No | `none` | Verify mode. `none`, `drift`, or `any` — see [Verifying your manual](#verifying-your-manual) |
+| `github-token` | No | — | Verify mode. Scopes the check to the pull request's changed files |
 
 ## Examples
 
@@ -61,6 +64,71 @@ jobs:
     project: my-app
     entry-type: fix
 ```
+
+## Verifying your manual
+
+Set `mode: verify` to check a DeployLog manual against the code it cites. Findings land as
+annotations on the changed lines of the pull request, and the check stays green until you ask it
+not to.
+
+```yaml
+name: Manual check
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: read   # so the Action can read which files this pull request changes
+
+jobs:
+  manual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: deploylogdev/action@v1
+        with:
+          api-key: ${{ secrets.DEPLOYLOG_API_KEY }}
+          project: my-app
+          mode: verify
+          github-token: ${{ github.token }}
+```
+
+No `actions/checkout` step is needed. The Action does not read your working tree: it sends the
+commit and the list of changed paths, and DeployLog reads the code through the GitHub App you
+already connected.
+
+### `fail-on`
+
+| Value | The check fails when |
+|-------|----------------------|
+| `none` (default) | Never. Findings are annotated and summarised, the check stays green. |
+| `drift` | A cited value moved — the manual says one thing and the code says another. |
+| `any` | Also when the run could not vouch for the manual: claims it could not read, chapters with no claims, chapters with too little coverage, or claims in a repository nothing is watching. |
+
+Drift and "could not vouch" are reported separately and never merged, so a broken checker cannot
+read as a clean one. Start on `none`, and move up once the findings are ones you trust.
+
+### If your manual spans several repositories
+
+A verify run proves that *this* repository runs the check, and asserts nothing about the others. So
+a manual citing four repositories reports the other three as untriggered on every run, and
+`fail-on: any` will fail on a manual with no drift in it until each of those repositories runs the
+check too. That is the honest answer rather than a defect — use `fail-on: drift` in the meantime.
+
+### Without `github-token`
+
+The run verifies the whole manual instead of just what the pull request touched. It still works;
+it is noisier, and every finding in the manual is reported on every pull request.
+
+## Outputs
+
+| Output | Mode | Description |
+|--------|------|-------------|
+| `entry-id`, `entry-slug`, `entry-published`, `ai-used` | publish | The created entry |
+| `drift-count` | verify | Claims whose cited value moved. The only drift signal. |
+| `error-count` | verify | Claims that could not be read at all. Not drift. |
+| `unanchored-count` | verify | Chapters that declare no claims. |
+| `untriggered-count` | verify | Claims in a repository nothing is watching. |
+| `low-coverage-chapters` | verify | Comma-separated chapter numbers with thin claim coverage. |
+| `check-failed` | verify | Whether `fail-on` escalated this run to a failure. |
 
 ## How It Works
 
