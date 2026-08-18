@@ -104,7 +104,19 @@ export function createApiClient(config: ApiClientConfig) {
     })
   }
 
-  return { createEntry, summarize }
+  /**
+   * Read-only. The route mutates nothing, so the API key needs `read` permission
+   * and nothing more. The response arrives wrapped as `{ data: <report> }`, which
+   * `request` already unwraps.
+   */
+  async function verifyManual(input: ManualVerifyRequest): Promise<VerificationReport> {
+    return request<VerificationReport>('/api/cli/manual/verify', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  }
+
+  return { createEntry, summarize, verifyManual }
 }
 
 function extractError(payload: unknown): { message?: string; code?: string } {
@@ -127,4 +139,110 @@ function extractData(payload: unknown): unknown {
     return (payload as { data: unknown }).data
   }
   return payload
+}
+
+// --- Manual verification (issue 55) ---
+//
+// A mirror of the endpoint's *wire* contract, `ManualVerifyRequestSchema` and
+// `ManualVerifyResponseSchema` in the deploylog repository's `src/lib/schemas.ts`.
+// Deliberately not a mirror of `manual-verification.ts`: the service type is what
+// the checker computes, the schema is what crosses the boundary, and the route
+// validates the report against the schema on the way out precisely so the two can
+// differ. Mirroring the wrong one is how BUG-027 happened.
+
+export const VERIFY_VERDICTS = [
+  'CONFIRMED',
+  'SUSPECT',
+  'CLEAR',
+  'ERROR',
+  'UNANCHORED',
+] as const
+
+export type VerifyVerdict = (typeof VERIFY_VERDICTS)[number]
+
+export const VERIFY_ERROR_REASONS = [
+  'no_access',
+  'not_found',
+  'not_configured',
+  'unavailable',
+  'invalid_request',
+  'unmapped_repository',
+  'missing_symbol',
+  'malformed_claim',
+  'unsupported_value',
+] as const
+
+export type VerifyErrorReason = (typeof VERIFY_ERROR_REASONS)[number]
+
+/**
+ * The request body. The schema is `.strict()`, so an unknown field is a 400 and
+ * not a silent strip — this interface is exact on purpose.
+ *
+ * `project` is the DeployLog project slug, never a version id; the route resolves
+ * that project's working version. `ref` is a full 40-character sha. `changedFiles`
+ * is a list of repository-relative paths, or null for a full sweep — paths only,
+ * because the server pairs them with `repository` so that a run cannot declare a
+ * change in a repository it is not running in.
+ */
+export interface ManualVerifyRequest {
+  project: string
+  repository: string
+  ref: string
+  changedFiles: string[] | null
+}
+
+export interface VerifyConfirmedFinding {
+  claimId: string
+  text: string
+  repository: string
+  source: string
+  /** Where the value sits now, or null when the finding is a disappearance. */
+  line: number | null
+  detail: string
+}
+
+export interface VerifyErrorFinding {
+  claimId: string
+  text: string
+  repository: string
+  source: string
+  reason: VerifyErrorReason
+  detail: string
+}
+
+export interface VerifyUntriggeredFinding {
+  claimId: string
+  text: string
+  repository: string
+}
+
+export interface VerifyCoverage {
+  sentences: number
+  measurable: number
+  claimed: number
+  ratio: number | null
+  unclaimed: string[]
+}
+
+export interface VerifyChapterResult {
+  number: string
+  title: string
+  state: VerifyVerdict
+  confirmed: VerifyConfirmedFinding[]
+  errors: VerifyErrorFinding[]
+  touched: string[]
+  coverage: VerifyCoverage
+  untriggered: VerifyUntriggeredFinding[]
+}
+
+export interface VerificationReport {
+  chapters: VerifyChapterResult[]
+  confirmedCount: number
+  errorCount: number
+  unanchoredCount: number
+  evaluatedCount: number
+  skippedCount: number
+  lowCoverageChapters: string[]
+  untriggeredCount: number
+  unverifiable: boolean
 }

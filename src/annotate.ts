@@ -57,7 +57,12 @@ export interface VerificationCounts {
  * not a mirror. Kept as narrow as the delivery rules need, because a second
  * copy of a contract in a second repository is how the Action came to send a
  * `null` version the server rejects (BUG-027). Source of truth is
- * `src/lib/manual-verification.ts` in the deploylog repository.
+ * `ManualVerifyResponseSchema` in `src/lib/schemas.ts` in the deploylog
+ * repository — the wire contract, not the `manual-verification.ts` service type
+ * this comment used to name. The route validates its report against that schema
+ * on the way out precisely so the two are allowed to differ, which makes the
+ * service type the wrong thing to mirror. `api.ts` holds the full mirror; this
+ * stays the narrow view of it that the delivery rules read.
  */
 export interface VerificationReportView extends VerificationCounts {
   chapters: ChapterFindings[]

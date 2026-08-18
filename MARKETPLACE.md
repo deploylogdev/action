@@ -54,9 +54,18 @@ jobs:
 |-------|----------|---------|-------------|
 | `api-key` | Yes | — | Your DeployLog API key |
 | `project` | Yes | — | Project slug from your DeployLog dashboard |
-| `ai-summarize` | No | `false` | Use AI to rewrite release notes for end users |
-| `notify-subscribers` | No | `false` | Send email digest to subscribers on publish |
-| `entry-type` | No | `feature` | Entry type: feature, fix, improvement, breaking |
+| `mode` | No | `publish` | `publish` a release as a changelog entry, or `verify` your manual against the code |
+| `ai-summarize` | No | `false` | Publish mode. Use AI to rewrite release notes for end users |
+| `notify-subscribers` | No | `false` | Publish mode. Send email digest to subscribers on publish |
+| `entry-type` | No | `feature` | Publish mode. feature, fix, improvement, breaking |
+| `fail-on` | No | `none` | Verify mode. `none`, `drift`, or `any` |
+| `github-token` | No | — | Verify mode. Scopes the check to a pull request's changed files |
+| `skip-prerelease` | No | `false` | Publish mode. Skip GitHub prereleases |
+| `api-url` | No | — | Override the API base URL for staging or self-hosted |
+
+The Short and Long Descriptions above still describe publish mode only. They need a rewrite before
+the version carrying verify mode is tagged; `action.yml`'s description was already updated and the
+two must not go live disagreeing.
 
 ### Requirements
 
