@@ -1,6 +1,6 @@
 # 59 — Marketplace copy for verify mode (draft for Marko)
 
-**Status:** draft, awaiting Marko's edit · **Type:** HUMAN · **Lane:** deploylog-action
+**Status:** applied 2026-08-18 (Option A). Only the em-dash question is open · **Type:** HUMAN · **Lane:** deploylog-action
 **Blocks:** tagging the version that carries verify mode. `action.yml`'s description already
 advertises it, and the two must not go live disagreeing.
 
@@ -13,7 +13,7 @@ Current, publish-only:
 
 > Publish changelog entries from GitHub Releases. AI-polished release notes.
 
-**Option A (75 chars).** Plain, symmetric, says what both modes do.
+**Option A (75 chars). CHOSEN 2026-08-18, applied to `MARKETPLACE.md`.**
 
 > Publish changelogs from Releases. Check your manual still matches the code.
 
@@ -48,10 +48,10 @@ To sit after the existing "Ship the update. Skip the busywork." paragraphs, befo
 > - Findings appear inline on the changed line, not in a report nobody opens
 > - Green by default, so it cannot break an existing build the day you add it
 
-## Two things to decide
+## Still open
 
 1. **The existing Long Description uses em dashes** ("your product's website — automatically"). That
    predates the punctuation rule. Left alone rather than rewritten quietly. Say the word and it goes.
-2. **Do not tag until the copy lands.** `action.yml:2` already names verify mode, so a release
-   shipped before this edit puts a listing and a manifest into the Marketplace saying different
-   things about the same version.
+2. ~~Do not tag until the copy lands.~~ Settled: the copy landed 2026-08-18, so `MARKETPLACE.md`
+   and `action.yml` now agree. The remaining tag blocker is elsewhere: whether verify mode should
+   ship before its observable arm has ever run (issue 55, criterion 1).
