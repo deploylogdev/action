@@ -256,7 +256,10 @@ describe('run', () => {
     expect(logger.failures[0]).toMatch(/Failed to create DeployLog entry: project not found/)
   })
 
-  it('passes null version when tag is not semver', async () => {
+  it('sends an empty version, never null, when the tag is not semver', async () => {
+    // BUG-027. The server's version field rejects null and accepts '', so the
+    // old behaviour asserted here turned a user's release workflow red with a
+    // 400. The entry still publishes; it just carries no version number.
     const release: ReleasePayload = {
       tag_name: 'spring-2026',
       name: 'Spring 2026',
@@ -265,7 +268,20 @@ describe('run', () => {
     await run({ inputs: baseInputs, release, logger, clientFactory: makeClientFactory(client) })
     expect(client.createEntry).toHaveBeenCalledWith(
       'my-app',
-      expect.objectContaining({ version: null }),
+      expect.objectContaining({ version: '' }),
+    )
+  })
+
+  it('sends the bare number for a tag carrying build metadata', async () => {
+    const release: ReleasePayload = {
+      tag_name: 'v1.0.0+build.42',
+      name: 'Build 42',
+      body: 'notes',
+    }
+    await run({ inputs: baseInputs, release, logger, clientFactory: makeClientFactory(client) })
+    expect(client.createEntry).toHaveBeenCalledWith(
+      'my-app',
+      expect.objectContaining({ version: '1.0.0' }),
     )
   })
 })
