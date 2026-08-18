@@ -1,6 +1,6 @@
 # 55 — Manual verify mode: transport, changed files, and the real pull-request arm
 
-**Status:** blocked (observable arm only) · **Type:** AFK · **Lane:** deploylog-action
+**Status:** DONE 2026-08-18. All six criteria met, criterion 1 observed on a live run.
 **Parent:** ../deploylog/issues/prd-manual.md *(PRD lives in the deploylog repo)*
 **Blocked by:** ~~`../deploylog/issues/56`~~ — cleared 2026-08-18. deploylog PRs #54 and #55 merged;
 `src/app/api/cli/manual/verify/route.ts` is live on `main` (`9bedc81`), confirmed against
@@ -30,9 +30,11 @@ them to a real run.
 
 ## Acceptance criteria
 
-- [ ] A scratch pull request changing a cited constant shows the annotation inline on the changed line.
-- [~] With `fail-on: none` the check is green and the finding is still visible in the output.
-      Decided and tested (`verify.test.ts`); "visible" is only observable on the real run.
+- [x] A scratch pull request changing a cited constant shows the annotation inline on the changed line.
+      Observed 2026-08-18 on marko-builds/deploylog PR #57. See the run record below.
+- [x] With `fail-on: none` the check is green and the finding is still visible in the output.
+      Observed: check conclusion `success`, one warning-level annotation carrying the manual
+      sentence and the detail.
 - [x] With `fail-on: drift` the same finding fails the check. (`verify.test.ts`)
 - [x] With `fail-on: any` a run with errors and no drift fails the check. (`verify.test.ts`)
 - [x] A run with no findings is silent: no annotations, no job summary. (`verify.test.ts`)
@@ -136,6 +138,57 @@ unlaunched feature's schema to production to unblock a test. Nothing about the a
 the schema ships, the setup is: an API key with `read`, connect `marko-builds/deploylog`
 (installation id **153878377**), a manual chapter citing `src/lib/plan.ts`'s `FREE_PROJECT_LIMIT`,
 then a scratch pull request changing that constant.
+
+## Observable arm: RUN AND PASSED, 2026-08-18
+
+`marko-builds/deploylog` PR #57, `deploylogdev/action@v1` at v1.2.1. The annotation GitHub rendered,
+verbatim from the check-runs API:
+
+```
+src/lib/plan.ts:15  [warning]  Manual drift in chapter 01
+    This line no longer matches what the manual says about it.
+    Manual sentence: "The free plan allows 3 projects."
+    FREE_PROJECT_LIMIT is 4, the manual says 3.
+    Chapter 01 " Plan limits", claim free-project-limit.
+```
+
+Counts: `drift-count=1 error-count=0 unanchored-count=0 untriggered-count=0 check-failed=false`.
+
+**The out-of-hunk risk carried forward from issue 45 did not bite, and the reason is the ref
+choice.** The run logged `head sha = dd92d5c` against `context sha = 604047f` — genuinely different
+commits. `finding.line` is computed at whatever ref the request names, so had the Action sent
+`context.sha` the finding would have been computed at a merge commit that exists in no branch, and
+GitHub would have dropped the annotation without reporting anything. `verify-context.ts`'s headline
+rule is load-bearing and is now demonstrated, not argued.
+
+**Changed-file scoping worked**: `Verifying claims that cite any of the 2 files this pull request
+changes`, and the claim citing `src/lib/plan.ts` was evaluated while nothing else was.
+
+### Still unmeasured: the 10-annotation cap
+
+This run produced ONE annotation, so the cap was never approached. The risk recorded above stands
+untested. Measuring it needs a chapter with more than ten claims over one file, which is a separate
+exercise.
+
+### Three defects the arm exposed, none of them in this slice
+
+1. **v1.2.0 could not load at all.** `${{ }}` in an `action.yml` input *description*; Actions
+   evaluates expressions in manifest metadata. Fixed in v1.2.1 with `action-manifest.test.ts`.
+   Nothing in the repo had ever read `action.yml`, which is why a full green suite shipped it.
+2. **The Action discards `reason` and `detail` from error findings.** Diagnosing why the run
+   reported nothing took a workflow edit to print the outputs, then a local reproduction, then a
+   two-arm control. `renderSummary` prints "1 claim could not be read at all" and drops the
+   `not_configured` that would have named the cause in one glance.
+3. **A deployment with no GitHub App credentials reports a green check.** Every claim errors with
+   `not_configured` and the run is `unverifiable` with zero drift. A server that cannot read any
+   file has not verified anything and should say so with a 503, not a per-claim error finding.
+
+### What the setup actually required, for whoever repeats it
+
+Three migrations applied to production, `MANUAL_ENABLED=true`, `GITHUB_APP_ID` and
+`GITHUB_APP_PRIVATE_KEY` on Vercel (all three env vars needing their own redeploy), a
+`connected_repositories` row inserted by hand (no UI exists), and the claim inserted by hand
+(`generateChapter` has no production caller). Two of those were discovered only by the run failing.
 
 ## Carried forward from issue 45
 
