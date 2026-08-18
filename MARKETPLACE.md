@@ -2,7 +2,7 @@
 
 ## Short Description (max 80 characters)
 
-Publish changelog entries from GitHub Releases. AI-polished release notes.
+Publish changelogs from Releases. Check your manual still matches the code.
 
 ## Primary Category
 
@@ -20,6 +20,14 @@ DeployLog turns your GitHub Releases into beautiful changelog entries on your pr
 
 Optionally, use AI to transform technical commit messages into user-friendly release notes your customers will actually read.
 
+### Docs go stale quietly.
+
+A constant changes, the sentence describing it does not, and nobody finds out until a customer reads the old number. Nothing fails. Nothing is flagged. The doc just stops being true.
+
+Set `mode: verify` and this Action checks your DeployLog manual against the code it cites, on every pull request. When a cited value moves, the finding lands as an annotation on the changed line, next to the change that caused it.
+
+It starts quiet. On the default setting the check stays green and the findings are informational, so adding it to a busy repository breaks nothing on day one. When you trust it, `fail-on: drift` makes stale docs fail the build.
+
 ### Features
 
 - Trigger on `release.published` events
@@ -27,6 +35,9 @@ Optionally, use AI to transform technical commit messages into user-friendly rel
 - Notify email subscribers automatically
 - Tag entries by type (feature, fix, improvement, breaking change)
 - Zero configuration beyond an API key
+- Verify your manual against the code it cites, on every pull request
+- Findings appear inline on the changed line, not in a report nobody opens
+- Green by default, so it cannot break an existing build the day you add it
 
 ### Quick Start
 
@@ -62,10 +73,6 @@ jobs:
 | `github-token` | No | — | Verify mode. Scopes the check to a pull request's changed files |
 | `skip-prerelease` | No | `false` | Publish mode. Skip GitHub prereleases |
 | `api-url` | No | — | Override the API base URL for staging or self-hosted |
-
-The Short and Long Descriptions above still describe publish mode only. They need a rewrite before
-the version carrying verify mode is tagged; `action.yml`'s description was already updated and the
-two must not go live disagreeing.
 
 ### Requirements
 
