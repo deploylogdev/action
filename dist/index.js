@@ -25754,11 +25754,14 @@ function extractData(payload) {
 }
 
 // src/release.ts
-var SEMVER = /^v?(\d+\.\d+\.\d+(?:[-+][\w.-]+)?)$/;
+var SEMVER = /^v?(\d+\.\d+\.\d+)(?:-([\w.-]+))?(?:\+([\w.-]+))?$/;
 function extractVersion(tag) {
-  if (!tag) return null;
-  const match = tag.match(SEMVER);
-  return match?.[1] ?? null;
+  if (!tag) return "";
+  const match = tag.trim().match(SEMVER);
+  if (!match) return "";
+  const [, release, prerelease] = match;
+  if (prerelease) return "";
+  return release ?? "";
 }
 function deriveEntryFromRelease(release) {
   const tag = release.tag_name?.trim() ?? "";

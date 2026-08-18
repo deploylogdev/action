@@ -133,7 +133,7 @@ describe('createApiClient', () => {
       title: 't',
       body_markdown: 'b',
       entry_type: 'fix',
-      version: null,
+      version: '',
       publish: false,
     })
     const mockFetch = fetchFn as unknown as ReturnType<typeof vi.fn>
@@ -172,7 +172,7 @@ describe('createApiClient', () => {
         title: 't',
         body_markdown: 'b',
         entry_type: 'feature',
-        version: null,
+        version: '',
         publish: false,
       }),
     ).rejects.toBeInstanceOf(ApiError)
@@ -208,7 +208,7 @@ describe('createApiClient', () => {
       title: 't',
       body_markdown: 'b',
       entry_type: 'feature',
-      version: null,
+      version: '',
       publish: false,
     })
     expect(res.id).toBe('entry-raw')

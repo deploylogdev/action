@@ -4,7 +4,13 @@ export interface CreateEntryInput {
   title: string
   body_markdown: string
   entry_type: EntryType
-  version: string | null
+  /**
+   * Bare MAJOR.MINOR.PATCH, or '' for no version. **Not nullable**, and that is
+   * load-bearing rather than tidy: the server's `CreateEntrySchema.version`
+   * rejects `null` outright, so the old `string | null` here was a type that
+   * permitted the exact payload the API 400s on. That was BUG-027.
+   */
+  version: string
   publish: boolean
 }
 
