@@ -21,7 +21,13 @@ inputs:
     required: false
     default: none
   github-token:
-    description: "Verify mode only. Used to read the pull request's changed files so the check is scoped to them. Pass ${{ github.token }} with `permissions: pull-requests: read`. Without it the whole manual is verified on every run."
+    # No expression syntax anywhere in this file. Actions evaluates expressions in
+    # action.yml metadata, descriptions included, and `github` is not a context
+    # that exists at load time. One interpolation here made the whole action fail
+    # to load for every consumer, in both modes, before a single input was read.
+    # Describe the token in prose; the README carries the copyable snippet.
+    # Enforced by src/action-manifest.test.ts.
+    description: "Verify mode only. Used to read the pull request's changed files so the check is scoped to them. Pass the workflow's github.token with `permissions: pull-requests: read`. Without it the whole manual is verified on every run."
     required: false
     default: ""
   ai-summarize:
