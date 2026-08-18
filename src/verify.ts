@@ -22,7 +22,7 @@ import { createApiClient } from './api.js'
 import type { ActionLogger } from './run.js'
 import type { VerifyContext } from './verify-context.js'
 import type { VerificationReportView } from './annotate.js'
-import { planAnnotations } from './annotate.js'
+import { ANNOTATION_LIMIT, planAnnotations } from './annotate.js'
 import { decideVerdict, renderSummary } from './verdict.js'
 
 export interface VerifyRunOptions {
@@ -69,7 +69,12 @@ export async function runVerify(opts: VerifyRunOptions): Promise<void> {
   // removing it left every test green, which is what a guard with no reachable
   // case looks like.
   const level = verdict.failed ? 'error' : 'warning'
-  for (const annotation of plan.annotations) logger.annotate(annotation, level)
+  // Bounded on purpose. GitHub renders the first ANNOTATION_LIMIT and discards
+  // the rest in silence, so emitting more does not deliver more; it only makes
+  // the run believe it did. Everything past the bound is listed in the summary.
+  for (const annotation of plan.annotations.slice(0, ANNOTATION_LIMIT)) {
+    logger.annotate(annotation, level)
+  }
 
   logger.setOutput('drift-count', String(verdict.drift))
   logger.setOutput('error-count', String(view.errorCount))

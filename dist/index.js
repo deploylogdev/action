@@ -25497,6 +25497,52 @@ var github = __toESM(require_github());
 // src/inputs.ts
 var core = __toESM(require_core());
 
+// src/annotate.ts
+var ANNOTATION_LIMIT = 10;
+var canonicalSlug = (repository) => repository.trim().toLowerCase();
+function planAnnotations(report, context2) {
+  const here = canonicalSlug(context2.repository);
+  const annotations = [];
+  const unreachable = [];
+  for (const chapter of report.chapters) {
+    for (const finding of chapter.confirmed) {
+      if (canonicalSlug(finding.repository) !== here) {
+        unreachable.push(describe(finding, chapter, "other_repository"));
+        continue;
+      }
+      if (finding.line === null) {
+        unreachable.push(describe(finding, chapter, "no_line"));
+        continue;
+      }
+      annotations.push({
+        file: finding.source,
+        line: finding.line,
+        title: `Manual drift in chapter ${chapter.number}`,
+        message: findingMessage(finding, chapter)
+      });
+    }
+  }
+  return { annotations, unreachable };
+}
+function describe(finding, chapter, reason) {
+  return {
+    reason,
+    chapter: chapter.number,
+    text: finding.text,
+    repository: finding.repository,
+    source: finding.source,
+    detail: finding.detail
+  };
+}
+function findingMessage(finding, chapter) {
+  return [
+    "This line no longer matches what the manual says about it.",
+    `Manual sentence: "${finding.text}"`,
+    finding.detail,
+    `Chapter ${chapter.number} "${chapter.title}", claim ${finding.claimId}.`
+  ].join("\n");
+}
+
 // src/verdict.ts
 var FAIL_ON_VALUES = ["none", "drift", "any"];
 var DEFAULT_FAIL_ON = "none";
@@ -25566,12 +25612,24 @@ function renderSummary(report, plan, verdict) {
   if (verdict.drift === 0 && verdict.reasons.length === 0) return "";
   const lines = ["## DeployLog manual check", ""];
   if (verdict.drift > 0) {
+    const shown = Math.min(plan.annotations.length, ANNOTATION_LIMIT);
+    const overflow = plan.annotations.slice(ANNOTATION_LIMIT);
     lines.push(
-      `**Drift: ${plural(verdict.drift, "claim")} no longer match the code.**`,
+      `**Drift: ${plural(verdict.drift, "claim")} no longer ${verdict.drift === 1 ? "matches" : "match"} the code.**`,
       "",
-      `${plural(plan.annotations.length, "finding")} annotated inline on the changed lines.`,
+      overflow.length > 0 ? `${shown} of ${plan.annotations.length} findings annotated inline on the changed lines; GitHub renders no more than ${ANNOTATION_LIMIT} per run.` : `${plural(shown, "finding")} annotated inline on the changed lines.`,
       ""
     );
+    if (overflow.length > 0) {
+      lines.push(
+        `### ${plural(overflow.length, "finding")} not shown inline`,
+        "",
+        ...overflow.map(
+          (annotation) => `- \`${annotation.file}:${annotation.line}\`: ${annotation.message.split("\n").filter(Boolean).join(" ")}`
+        ),
+        ""
+      );
+    }
   } else {
     lines.push("**No drift found.**", "");
   }
@@ -25772,51 +25830,6 @@ function deriveEntryFromRelease(release) {
   return { title, body, version };
 }
 
-// src/annotate.ts
-var canonicalSlug = (repository) => repository.trim().toLowerCase();
-function planAnnotations(report, context2) {
-  const here = canonicalSlug(context2.repository);
-  const annotations = [];
-  const unreachable = [];
-  for (const chapter of report.chapters) {
-    for (const finding of chapter.confirmed) {
-      if (canonicalSlug(finding.repository) !== here) {
-        unreachable.push(describe(finding, chapter, "other_repository"));
-        continue;
-      }
-      if (finding.line === null) {
-        unreachable.push(describe(finding, chapter, "no_line"));
-        continue;
-      }
-      annotations.push({
-        file: finding.source,
-        line: finding.line,
-        title: `Manual drift in chapter ${chapter.number}`,
-        message: findingMessage(finding, chapter)
-      });
-    }
-  }
-  return { annotations, unreachable };
-}
-function describe(finding, chapter, reason) {
-  return {
-    reason,
-    chapter: chapter.number,
-    text: finding.text,
-    repository: finding.repository,
-    source: finding.source,
-    detail: finding.detail
-  };
-}
-function findingMessage(finding, chapter) {
-  return [
-    "This line no longer matches what the manual says about it.",
-    `Manual sentence: "${finding.text}"`,
-    finding.detail,
-    `Chapter ${chapter.number} "${chapter.title}", claim ${finding.claimId}.`
-  ].join("\n");
-}
-
 // src/verify.ts
 async function runVerify(opts) {
   const { inputs, context: context2, logger } = opts;
@@ -25837,7 +25850,9 @@ async function runVerify(opts) {
   const plan = planAnnotations(view, { repository: context2.repository });
   const verdict = decideVerdict(view, inputs.failOn);
   const level = verdict.failed ? "error" : "warning";
-  for (const annotation of plan.annotations) logger.annotate(annotation, level);
+  for (const annotation of plan.annotations.slice(0, ANNOTATION_LIMIT)) {
+    logger.annotate(annotation, level);
+  }
   logger.setOutput("drift-count", String(verdict.drift));
   logger.setOutput("error-count", String(view.errorCount));
   logger.setOutput("unanchored-count", String(view.unanchoredCount));

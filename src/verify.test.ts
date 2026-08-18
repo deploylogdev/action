@@ -6,6 +6,7 @@ import type { ActionLogger } from './run.js'
 import type { Annotation } from './annotate.js'
 import type { FailOn } from './verdict.js'
 import type { VerifyContext } from './verify-context.js'
+import { ANNOTATION_LIMIT } from './annotate.js'
 
 const REPO = 'marko-builds/deploylog'
 const REF = 'd'.repeat(40)
@@ -87,6 +88,33 @@ function withDrift(): VerificationReport {
             detail: 'The manual says 5; the code says 10.',
           },
         ],
+        errors: [],
+        touched: ['src/lib/limits.ts'],
+        coverage: { sentences: 8, measurable: 4, claimed: 4, ratio: 1, unclaimed: [] },
+        untriggered: [],
+      },
+    ],
+  })
+}
+
+/** `n` drifted claims, all in this repository, all on a line of their own. */
+function withDriftCount(n: number): VerificationReport {
+  return report({
+    confirmedCount: n,
+    unverifiable: true,
+    chapters: [
+      {
+        number: '03',
+        title: 'Limits',
+        state: 'CONFIRMED',
+        confirmed: Array.from({ length: n }, (_, i) => ({
+          claimId: `claim-${i + 1}`,
+          text: `Claim ${i + 1}.`,
+          repository: REPO,
+          source: 'src/lib/limits.ts',
+          line: 10 + i,
+          detail: `Detail ${i + 1}.`,
+        })),
         errors: [],
         touched: ['src/lib/limits.ts'],
         coverage: { sentences: 8, measurable: 4, claimed: 4, ratio: 1, unclaimed: [] },
@@ -222,5 +250,46 @@ describe('runVerify', () => {
     await runVerify({ inputs: inputs('none'), context, logger: harness.logger, clientFactory })
     expect(harness.failures[0]).toContain('has no manual to verify')
     expect(harness.annotations).toEqual([])
+  })
+})
+
+describe('runVerify and the annotation limit', () => {
+  it('emits at most the limit, however many findings the report carries', async () => {
+    // The bound that matters. GitHub renders ANNOTATION_LIMIT per level per step
+    // and discards the rest in silence, so emitting more does not deliver more,
+    // it only makes the run believe it did.
+    const h = runWith(withDriftCount(ANNOTATION_LIMIT + 7), 'none')
+    await h.done
+    expect(h.annotations).toHaveLength(ANNOTATION_LIMIT)
+  })
+
+  it('emits the FIRST findings, so the summary and the diff agree on which are missing', async () => {
+    // renderSummary lists `annotations.slice(ANNOTATION_LIMIT)` as the ones not
+    // shown. If the emit took a different subset, both halves would be true
+    // separately and the pair would be a lie.
+    const h = runWith(withDriftCount(ANNOTATION_LIMIT + 2), 'none')
+    await h.done
+    expect(h.annotations.map((a) => a.annotation.line)).toEqual(
+      Array.from({ length: ANNOTATION_LIMIT }, (_, i) => 10 + i),
+    )
+    expect(h.summaries[0]).toContain(`Claim ${ANNOTATION_LIMIT + 1}.`)
+    expect(h.summaries[0]).toContain(`Claim ${ANNOTATION_LIMIT + 2}.`)
+  })
+
+  it('emits every finding when the report is under the limit', async () => {
+    // The known negative: without it, an emitter that dropped everything would
+    // satisfy the bound above.
+    const h = runWith(withDriftCount(ANNOTATION_LIMIT - 3), 'none')
+    await h.done
+    expect(h.annotations).toHaveLength(ANNOTATION_LIMIT - 3)
+    expect(h.summaries[0]).not.toContain('not shown inline')
+  })
+
+  it('still reports the full drift count when the annotations are bounded', async () => {
+    // The count is about the manual; the bound is about GitHub's renderer. They
+    // must not be confused for one another.
+    const h = runWith(withDriftCount(ANNOTATION_LIMIT + 5), 'none')
+    await h.done
+    expect(h.outputs['drift-count']).toBe(String(ANNOTATION_LIMIT + 5))
   })
 })

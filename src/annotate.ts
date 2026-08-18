@@ -68,6 +68,21 @@ export interface VerificationReportView extends VerificationCounts {
   chapters: ChapterFindings[]
 }
 
+/**
+ * How many annotations GitHub will render, per level, per step.
+ *
+ * Not a preference. GitHub renders the first ten and drops the rest with no
+ * error, no warning and nothing in the log, so an unbounded emit reports findings
+ * as delivered that nobody will ever see. `planAnnotations` deliberately does NOT
+ * apply this: it plans every finding it can place, and the bound belongs to
+ * delivery, because a finding dropped before it is planned cannot be reported at
+ * all — which is the defect rather than the fix.
+ *
+ * One constant, read by the code that emits and by the code that reports what was
+ * shown. Two copies of this number is how the two sentences come to disagree.
+ */
+export const ANNOTATION_LIMIT = 10
+
 export interface Annotation {
   /** Repository-relative path, as the workflow's checkout sees it. */
   file: string
