@@ -21,6 +21,8 @@
 // authoritative and separate. Leaving the field out of the type makes reading
 // it by accident impossible rather than merely discouraged.
 
+import type { VerifyErrorReason } from './api.js'
+
 /** A claim whose cited value moved. `line` is null when the value disappeared. */
 export interface ConfirmedFinding {
   claimId: string
@@ -32,10 +34,33 @@ export interface ConfirmedFinding {
   detail: string
 }
 
+/**
+ * A claim the server could not read at all. Not drift: the value did not move,
+ * the checker never reached it. `reason` is one of the server's nine codes and
+ * `detail` is the sentence that names the cause (a missing credential, a file
+ * that is not there, a symbol the claim no longer finds). An error has no line,
+ * so it is never annotated; it goes to the summary with both fields intact,
+ * because the count alone is what issue 60 found undiagnosable.
+ */
+export interface ErrorFinding {
+  claimId: string
+  text: string
+  repository: string
+  source: string
+  reason: VerifyErrorReason
+  detail: string
+}
+
+/**
+ * `errors` is carried through on purpose; `unverifiable` is not. The first is a
+ * per-claim finding a developer has to read, the second is the coarse flag the
+ * view below keeps out so exit status comes from the counts.
+ */
 export interface ChapterFindings {
   number: string
   title: string
   confirmed: ConfirmedFinding[]
+  errors: ErrorFinding[]
 }
 
 /**
@@ -103,9 +128,16 @@ export interface UnreachableFinding {
   detail: string
 }
 
+/** An error finding, with the chapter it sits in. Summary only; it has no line. */
+export interface ReportedError extends ErrorFinding {
+  chapter: string
+}
+
 export interface AnnotationPlan {
   annotations: Annotation[]
   unreachable: UnreachableFinding[]
+  /** Claims that could not be read. Listed beside drift, never counted as it. */
+  errors: ReportedError[]
 }
 
 /**
@@ -129,8 +161,12 @@ export function planAnnotations(
   const here = canonicalSlug(context.repository)
   const annotations: Annotation[] = []
   const unreachable: UnreachableFinding[] = []
+  const errors: ReportedError[] = []
 
   for (const chapter of report.chapters) {
+    for (const error of chapter.errors) {
+      errors.push({ ...error, chapter: chapter.number })
+    }
     for (const finding of chapter.confirmed) {
       if (canonicalSlug(finding.repository) !== here) {
         unreachable.push(describe(finding, chapter, 'other_repository'))
@@ -149,7 +185,7 @@ export function planAnnotations(
     }
   }
 
-  return { annotations, unreachable }
+  return { annotations, unreachable, errors }
 }
 
 function describe(

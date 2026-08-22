@@ -76,6 +76,15 @@ export async function runVerify(opts: VerifyRunOptions): Promise<void> {
     logger.annotate(annotation, level)
   }
 
+  // Unanchored on purpose: an error has no line, and a finding with no line
+  // still belongs in the log where a green check shows it. The full text is in
+  // the summary; this line carries what a developer searches for first.
+  for (const error of plan.errors) {
+    logger.warning(
+      `Manual claim could not be read (${error.reason}): "${error.text}" cites ${error.repository}/${error.source}. ${error.detail}`,
+    )
+  }
+
   logger.setOutput('drift-count', String(verdict.drift))
   logger.setOutput('error-count', String(view.errorCount))
   logger.setOutput('unanchored-count', String(view.unanchoredCount))

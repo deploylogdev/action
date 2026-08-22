@@ -25504,7 +25504,11 @@ function planAnnotations(report, context2) {
   const here = canonicalSlug(context2.repository);
   const annotations = [];
   const unreachable = [];
+  const errors = [];
   for (const chapter of report.chapters) {
+    for (const error2 of chapter.errors) {
+      errors.push({ ...error2, chapter: chapter.number });
+    }
     for (const finding of chapter.confirmed) {
       if (canonicalSlug(finding.repository) !== here) {
         unreachable.push(describe(finding, chapter, "other_repository"));
@@ -25522,7 +25526,7 @@ function planAnnotations(report, context2) {
       });
     }
   }
-  return { annotations, unreachable };
+  return { annotations, unreachable, errors };
 }
 function describe(finding, chapter, reason) {
   return {
@@ -25650,6 +25654,16 @@ function renderSummary(report, plan, verdict) {
       "Separate from drift, and not a clean bill of health:",
       "",
       ...verdict.reasons.map((reason) => `- ${reason.summary}`),
+      ""
+    );
+  }
+  if (plan.errors.length > 0) {
+    lines.push(
+      `### ${plural(plan.errors.length, "claim")} could not be read`,
+      "",
+      ...plan.errors.map(
+        (error2) => `- \`${error2.reason}\`: "${error2.text}" (chapter ${error2.chapter}, ${error2.repository}/${error2.source}). ${error2.detail}`
+      ),
       ""
     );
   }
@@ -25852,6 +25866,11 @@ async function runVerify(opts) {
   const level = verdict.failed ? "error" : "warning";
   for (const annotation of plan.annotations.slice(0, ANNOTATION_LIMIT)) {
     logger.annotate(annotation, level);
+  }
+  for (const error2 of plan.errors) {
+    logger.warning(
+      `Manual claim could not be read (${error2.reason}): "${error2.text}" cites ${error2.repository}/${error2.source}. ${error2.detail}`
+    );
   }
   logger.setOutput("drift-count", String(verdict.drift));
   logger.setOutput("error-count", String(view.errorCount));

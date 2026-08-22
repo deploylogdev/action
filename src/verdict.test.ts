@@ -22,6 +22,7 @@ function driftReportOf(n: number): VerificationReportView {
           line: 10 + i,
           detail: `Detail for claim ${i + 1}.`,
         })),
+        errors: [],
       },
     ],
     ...counts({ confirmedCount: n }),
@@ -58,6 +59,7 @@ function driftReport(): VerificationReportView {
             detail: 'The manual says 3. The code now reads 5.',
           },
         ],
+        errors: [],
       },
     ],
     ...counts({ confirmedCount: 1 }),
@@ -161,7 +163,47 @@ describe('parseFailOn', () => {
   })
 })
 
+/** One claim the server could not read, and no drift. The issue 60 shape. */
+function errorReport(): VerificationReportView {
+  return {
+    chapters: [
+      {
+        number: '4',
+        title: 'Plans and pricing',
+        confirmed: [],
+        errors: [
+          {
+            claimId: 'claim-1',
+            text: 'The free tier is capped at three projects.',
+            repository: REPO,
+            source: 'src/lib/plan.ts',
+            reason: 'not_configured',
+            detail: 'Could not read src/lib/plan.ts at dd92d5c: GITHUB_APP_ID must be set.',
+          },
+        ],
+      },
+    ],
+    ...counts({ errorCount: 1 }),
+  }
+}
+
 describe('renderSummary', () => {
+  it('lists each unreadable claim with its reason and detail, not just the count', () => {
+    const report = errorReport()
+    const plan = planAnnotations(report, { repository: REPO })
+    const verdict = decideVerdict(report, 'none')
+
+    const summary = renderSummary(report, plan, verdict)
+
+    expect(summary).toContain('1 claim could not be read at all.')
+    expect(summary).toContain('`not_configured`')
+    expect(summary).toContain('"The free tier is capped at three projects."')
+    expect(summary).toContain(`${REPO}/src/lib/plan.ts`)
+    expect(summary).toContain('GITHUB_APP_ID must be set.')
+    expect(summary).toContain('No drift found.')
+    expect(summary).not.toContain('Drift:')
+  })
+
   it('prints the drift prominently even when the check stays green', () => {
     const report = driftReport()
     const plan = planAnnotations(report, { repository: REPO })

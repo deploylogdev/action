@@ -188,6 +188,22 @@ export function renderSummary(
     )
   }
 
+  // Each unreadable claim, whole: the sentence, the file, the server's reason
+  // code and its detail. The reason line above carries the count and nothing
+  // else, and a count is what a developer cannot act on (issue 60: every claim
+  // failed `not_configured` and the output never said so).
+  if (plan.errors.length > 0) {
+    lines.push(
+      `### ${plural(plan.errors.length, 'claim')} could not be read`,
+      '',
+      ...plan.errors.map(
+        (error) =>
+          `- \`${error.reason}\`: "${error.text}" (chapter ${error.chapter}, ${error.repository}/${error.source}). ${error.detail}`,
+      ),
+      '',
+    )
+  }
+
   lines.push(verdict.failed ? verdict.failure ?? '' : escalationNote(verdict))
 
   return lines.join('\n').trimEnd() + '\n'

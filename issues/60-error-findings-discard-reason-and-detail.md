@@ -1,6 +1,6 @@
 # 60 — A failing verify run is undiagnosable from its own output
 
-**Status:** ready-for-agent · **Type:** AFK · **Lane:** deploylog-action
+**Status:** done · **Type:** AFK · **Lane:** deploylog-action
 **Found:** 2026-08-18, diagnosing the issue 55 observable arm.
 **Verification:** point the Action at a project whose deployment has no `GITHUB_APP_ID`. The check
 output must name `not_configured`. Today it does not.
@@ -54,12 +54,21 @@ be counted as drift, but it is the thing a developer needs to read when the chec
 
 ## Acceptance criteria
 
-- [ ] A run whose claims all fail with `not_configured` names `not_configured` in its output.
-- [ ] The failing file and the manual sentence appear beside the reason.
-- [ ] Errors are still reported separately from drift; `drift-count` does not move.
-- [ ] A clean run stays silent. This must not become a checker that chatters.
+- [x] A run whose claims all fail with `not_configured` names `not_configured` in its output.
+- [x] The failing file and the manual sentence appear beside the reason.
+- [x] Errors are still reported separately from drift; `drift-count` does not move.
+- [x] A clean run stays silent. This must not become a checker that chatters.
 
 ## Boundary
 
 `unverifiable` stays out of `VerificationReportView`. The reason that field is excluded is that exit
 status must come from the counts, and widening the view for `errors` must not smuggle it back in.
+
+## Resolution (2026-08-22)
+
+PR #12 merged this write-up only. The fix: `ChapterFindings` carries `errors` (an `ErrorFinding`
+with `reason` + `detail`; `unverifiable` stays out), `planAnnotations` collects them into
+`plan.errors`, `renderSummary` adds a "claims could not be read" section listing reason, sentence,
+file and detail, and `runVerify` logs one unanchored `core.warning` per error. `drift-count` and
+`error-count` are untouched. Tests: 4 new arms (verify x3, verdict x1), all RED before the fix.
+
