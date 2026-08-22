@@ -15,11 +15,15 @@ function makeLogger() {
   const outputs: Record<string, string> = {}
   const failures: string[] = []
   const messages: string[] = []
+  const warnings: string[] = []
   const annotations: Array<{ annotation: Annotation; level: string }> = []
   const summaries: string[] = []
   const logger: ActionLogger = {
     info: (m) => messages.push(m),
-    warning: (m) => messages.push(m),
+    warning: (m) => {
+      messages.push(m)
+      warnings.push(m)
+    },
     debug: (m) => messages.push(m),
     setOutput: (name, value) => {
       outputs[name] = value
@@ -30,7 +34,7 @@ function makeLogger() {
       summaries.push(markdown)
     },
   }
-  return { logger, outputs, failures, messages, annotations, summaries }
+  return { logger, outputs, failures, messages, warnings, annotations, summaries }
 }
 
 const inputs = (failOn: FailOn): ActionInputs => ({
@@ -117,6 +121,40 @@ function withDriftCount(n: number): VerificationReport {
         })),
         errors: [],
         touched: ['src/lib/limits.ts'],
+        coverage: { sentences: 8, measurable: 4, claimed: 4, ratio: 1, unclaimed: [] },
+        untriggered: [],
+      },
+    ],
+  })
+}
+
+/**
+ * The issue 60 scenario: production had no GitHub App credentials, so every
+ * claim failed with `not_configured`. Zero drift, nothing inline, and the only
+ * information a developer needed was on the wire and nowhere in the output.
+ */
+function withNotConfigured(): VerificationReport {
+  return report({
+    errorCount: 1,
+    unverifiable: true,
+    chapters: [
+      {
+        number: '03',
+        title: 'Limits',
+        state: 'ERROR',
+        confirmed: [],
+        errors: [
+          {
+            claimId: 'claim-1',
+            text: 'The free plan allows 5 projects.',
+            repository: REPO,
+            source: 'src/lib/plan.ts',
+            reason: 'not_configured',
+            detail:
+              'Could not read src/lib/plan.ts at dd92d5c: GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set.',
+          },
+        ],
+        touched: ['src/lib/plan.ts'],
         coverage: { sentences: 8, measurable: 4, claimed: 4, ratio: 1, unclaimed: [] },
         untriggered: [],
       },
@@ -226,6 +264,38 @@ describe('runVerify', () => {
     await h.done
     expect(h.failures).toEqual([])
     expect(h.messages.join('\n')).toContain('could not vouch')
+  })
+
+  it('names the error reason, the file and the manual sentence when a claim could not be read', async () => {
+    // Issue 60. The count alone ("1 claim could not be read at all") is what the
+    // first live run printed, and diagnosing it took a workflow edit and a local
+    // reproduction. Everything below was already in the response.
+    const h = runWith(withNotConfigured(), 'none')
+    await h.done
+    const summary = h.summaries[0] ?? ''
+    expect(summary).toContain('not_configured')
+    expect(summary).toContain('src/lib/plan.ts')
+    expect(summary).toContain('The free plan allows 5 projects.')
+    expect(summary).toContain('GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY must be set.')
+  })
+
+  it('reports an error beside drift, never as drift', async () => {
+    const h = runWith(withNotConfigured(), 'none')
+    await h.done
+    expect(h.outputs['drift-count']).toBe('0')
+    expect(h.outputs['error-count']).toBe('1')
+    expect(h.annotations).toEqual([])
+  })
+
+  it('logs one unanchored warning per error, so a green check still shows it', async () => {
+    // An error has no line to annotate. The log is the other surface a green
+    // check has, and the reason code belongs where a developer looks first.
+    const h = runWith(withNotConfigured(), 'none')
+    await h.done
+    expect(h.warnings).toHaveLength(1)
+    expect(h.warnings[0]).toContain('not_configured')
+    expect(h.warnings[0]).toContain('src/lib/plan.ts')
+    expect(h.annotations).toEqual([])
   })
 
   it('still reports check-failed when the endpoint is unreachable', async () => {

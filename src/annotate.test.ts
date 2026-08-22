@@ -25,7 +25,7 @@ function makeChapter(
   confirmed: ConfirmedFinding[],
   overrides: Partial<ChapterFindings> = {},
 ): ChapterFindings {
-  return { number: '4', title: 'Plans and pricing', confirmed, ...overrides }
+  return { number: '4', title: 'Plans and pricing', confirmed, errors: [], ...overrides }
 }
 
 function makeReport(
@@ -111,6 +111,6 @@ describe('planAnnotations', () => {
 
     const plan = planAnnotations(report, { repository: REPO })
 
-    expect(plan).toEqual({ annotations: [], unreachable: [] })
+    expect(plan).toEqual({ annotations: [], unreachable: [], errors: [] })
   })
 })
