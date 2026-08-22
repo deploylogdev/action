@@ -1,6 +1,6 @@
 # 45 — Manual check delivery: annotations, warning default, opt-in fail, loud bypass
 
-**Status:** delivery core done (2026-08-15) · **Type:** AFK · **Lane:** deploylog-action
+**Status:** done 2026-08-23 (delivery core 08-15; the deferred observable arm was closed by issue 55, DONE 08-18 with criterion 1 observed on a live run) · **Type:** AFK · **Lane:** deploylog-action
 **Parent:** ../deploylog/issues/prd-manual.md *(PRD lives in the deploylog repo)*
 **Blocked by:** `../deploylog/issues/42` (done) — an out-of-repo dependency this repo's DAG cannot see.
 **Verification:** PRD assertions 1 and 2, at the delivery surface. Failing tests to turn green in `src/annotate.test.ts` and `src/verdict.test.ts`, each guard with a control proving it can fire. Signal: `npm run typecheck && npm test`.
