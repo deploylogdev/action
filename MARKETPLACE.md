@@ -1,5 +1,11 @@
 # GitHub Marketplace Listing
 
+> **Read this first (2026-08-24).** A GitHub *Action* listing has no editable Short/Long
+> Description or category fields; those belong to GitHub *App* listings. The live page
+> https://github.com/marketplace/actions/publish-to-deploylog renders `action.yml`'s `description`
+> as the tagline and `README.md` as the body, verified by fetching the page. So this file is a copy
+> workbook, not a form to paste from: `action.yml` and `README.md` are the listing.
+
 ## Short Description (max 80 characters)
 
 Publish changelogs from Releases. Check your manual still matches the code.
