@@ -24,18 +24,18 @@ jobs:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `api-key` | Yes | — | Your DeployLog API key ([get one here](https://deploylog.dev/dashboard/api-keys)) |
-| `project` | Yes | — | Project slug from your DeployLog dashboard |
+| `api-key` | Yes | | Your DeployLog API key ([get one here](https://deploylog.dev/dashboard/api-keys)) |
+| `project` | Yes | | Project slug from your DeployLog dashboard |
 | `mode` | No | `publish` | `publish` a release as a changelog entry, or `verify` your manual against the code it cites |
 | `ai-summarize` | No | `false` | Publish mode. Rewrite release notes for end users using AI |
 | `notify-subscribers` | No | `false` | Publish mode. Send email digest to subscribers on publish |
 | `entry-type` | No | `feature` | Publish mode. `feature`, `fix`, `improvement`, `breaking`, `announcement` |
-| `fail-on` | No | `none` | Verify mode. `none`, `drift`, or `any` — see [Verifying your manual](#verifying-your-manual) |
-| `github-token` | No | — | Verify mode. Scopes the check to the pull request's changed files |
+| `fail-on` | No | `none` | Verify mode. `none`, `drift`, or `any`. See [Verifying your manual](#verifying-your-manual) |
+| `github-token` | No | | Verify mode. Scopes the check to the pull request's changed files |
 
 ## Examples
 
-### Basic — publish release notes as-is
+### Basic: publish release notes as-is
 
 ```yaml
 - uses: deploylogdev/action@v1
@@ -44,7 +44,7 @@ jobs:
     project: my-app
 ```
 
-### AI-powered — rewrite for end users
+### AI-powered: rewrite for end users
 
 ```yaml
 - uses: deploylogdev/action@v1
@@ -100,12 +100,12 @@ already connected.
 | Value | The check fails when |
 |-------|----------------------|
 | `none` (default) | No finding fails the check. Findings are annotated and summarised, and the check stays green. |
-| `drift` | A cited value moved — the manual says one thing and the code says another. |
+| `drift` | A cited value moved. The manual says one thing and the code says another. |
 | `any` | Also when the run could not vouch for the manual: claims it could not read, chapters with no claims, chapters with too little coverage, or claims in a repository nothing is watching. |
 
 `fail-on` selects which **findings** fail the check. It does not make the check unfailable: if the
-run cannot reach DeployLog at all — a rate limit, an expired key, an outage, a project with no
-manual — it fails at every setting, `none` included. A checker that could not read the manual has
+run cannot reach DeployLog at all (a rate limit, an expired key, an outage, a project with no
+manual), it fails at every setting, `none` included. A checker that could not read the manual has
 not vouched for it, and reporting green for that is the one failure this whole check exists to
 prevent.
 
@@ -135,7 +135,7 @@ being verified for those changes.
 A verify run proves that *this* repository runs the check, and asserts nothing about the others. So
 a manual citing four repositories reports the other three as untriggered on every run, and
 `fail-on: any` will fail on a manual with no drift in it until each of those repositories runs the
-check too. That is the honest answer rather than a defect — use `fail-on: drift` in the meantime.
+check too. That is the honest answer rather than a defect. Use `fail-on: drift` in the meantime.
 
 The same applies to thin chapters. `unanchored` and `low coverage` are measured across the whole
 manual, not just the files a pull request touched, so one chapter carrying no claims fails every
@@ -173,7 +173,7 @@ it is noisier, and every finding in the manual is reported on every pull request
 1. Sign up at [deploylog.dev](https://deploylog.dev) (free)
 2. Create a project and copy the project slug
 3. Generate an API key from your dashboard
-4. Add the API key as a repository secret: Settings → Secrets → `DEPLOYLOG_API_KEY`
+4. Add the API key as a repository secret: Settings, then Secrets, then add `DEPLOYLOG_API_KEY`
 5. Add the publish workflow from [Examples](#examples) to `.github/workflows/changelog.yml`
 
 ## Links
