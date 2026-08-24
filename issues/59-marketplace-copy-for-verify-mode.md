@@ -1,6 +1,6 @@
 # 59 — Marketplace copy for verify mode (draft for Marko)
 
-**Status:** applied 2026-08-18 (Option A). Only the em-dash question is open · **Type:** HUMAN · **Lane:** deploylog-action
+**Status:** done 2026-08-24. Option A applied 08-18; Marko said "kill the dashes" 08-24: every em dash and arrow in `MARKETPLACE.md` + `README.md` rewritten (PR on `chore/59-kill-the-dashes`); the Marketplace Long Description field is Marko's edit, replacement sentence in the PR body · **Type:** HUMAN · **Lane:** deploylog-action
 **Blocks:** tagging the version that carries verify mode. `action.yml`'s description already
 advertises it, and the two must not go live disagreeing.
 

@@ -16,7 +16,7 @@ Utilities
 
 ### Ship the update. Skip the busywork.
 
-DeployLog turns your GitHub Releases into beautiful changelog entries on your product's website — automatically. When you publish a release, this Action creates a changelog entry on DeployLog, which then appears in your embeddable widget, hosted changelog page, and subscriber email digests.
+DeployLog turns your GitHub Releases into beautiful changelog entries on your product's website, automatically. When you publish a release, this Action creates a changelog entry on DeployLog, which then appears in your embeddable widget, hosted changelog page, and subscriber email digests.
 
 Optionally, use AI to transform technical commit messages into user-friendly release notes your customers will actually read.
 
@@ -63,20 +63,20 @@ jobs:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `api-key` | Yes | — | Your DeployLog API key |
-| `project` | Yes | — | Project slug from your DeployLog dashboard |
+| `api-key` | Yes | | Your DeployLog API key |
+| `project` | Yes | | Project slug from your DeployLog dashboard |
 | `mode` | No | `publish` | `publish` a release as a changelog entry, or `verify` your manual against the code |
 | `ai-summarize` | No | `false` | Publish mode. Use AI to rewrite release notes for end users |
 | `notify-subscribers` | No | `false` | Publish mode. Send email digest to subscribers on publish |
 | `entry-type` | No | `feature` | Publish mode. feature, fix, improvement, breaking |
 | `fail-on` | No | `none` | Verify mode. `none`, `drift`, or `any` |
-| `github-token` | No | — | Verify mode. Scopes the check to a pull request's changed files |
+| `github-token` | No | | Verify mode. Scopes the check to a pull request's changed files |
 | `skip-prerelease` | No | `false` | Publish mode. Skip GitHub prereleases |
-| `api-url` | No | — | Override the API base URL for staging or self-hosted |
+| `api-url` | No | | Override the API base URL for staging or self-hosted |
 
 ### Requirements
 
-- A free DeployLog account — sign up at [deploylog.dev](https://deploylog.dev)
+- A free DeployLog account. Sign up at [deploylog.dev](https://deploylog.dev)
 - A DeployLog API key stored as a GitHub Secret (`DEPLOYLOG_API_KEY`)
 
 ### How It Works
