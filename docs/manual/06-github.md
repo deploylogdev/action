@@ -113,7 +113,7 @@ Findings land as annotations on the changed lines. GitHub caps how many it draws
 
 Findings with no line to attach to, every unreadable claim with its reason code, and every reason the run is not clean go in the job summary too. On a clean run, the summary is empty, and nothing is written.
 
-Verify mode sets `drift-count`, `error-count`, `unanchored-count`, `untriggered-count`, `low-coverage-chapters`, and `check-failed`.
+Verify mode sets `drift-count` (claims whose cited value moved), `error-count` (claims that could not be read), `unanchored-count` (chapters with no claims), `untriggered-count` (claims citing a repository this run did not check), `low-coverage-chapters` (chapters whose sentences with concrete values mostly carry no claim), and `check-failed`.
 
 Every run checks from scratch; a run changes nothing in the manual and remembers nothing from earlier runs.
 
@@ -129,4 +129,5 @@ GitHub withholds repository secrets from fork pull requests, so the key arrives 
 
 The publish workflow triggers on `types: [published]`, so it never touches releases you published before the workflow landed. Add those entries from the dashboard, where existing GitHub Releases can be brought in and filed against the same project.
 
-Chapter 05 covers writing the manual the check reads. Chapter 10 covers running the same check outside CI.
+Chapter 10 covers writing the manual the check reads. Chapter 05 covers running the same check outside CI.
+
